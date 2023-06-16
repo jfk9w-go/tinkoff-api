@@ -2,6 +2,8 @@ package tinkoff
 
 import (
 	"encoding/json"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -40,6 +42,125 @@ func (s *Seconds) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type auth int
+
+const (
+	none auth = iota
+	check
+	force
+)
+
+type exchange[R any] interface {
+	auth() auth
+	path() string
+	out() R
+	exprc() string
+}
+
+type response[R any] struct {
+	ResultCode      string `json:"resultCode"`
+	ErrorMessage    string `json:"errorMessage"`
+	Payload         R      `json:"payload"`
+	OperationTicket string `json:"operationTicket"`
+}
+
+type resultCodeError struct {
+	expected, actual string
+	message          string
+}
+
+func (e resultCodeError) Error() string {
+	var b strings.Builder
+	b.WriteString(e.actual)
+	b.WriteString(" != ")
+	b.WriteString(e.expected)
+	if e.message != "" {
+		b.WriteString(" (")
+		b.WriteString(e.message)
+		b.WriteString(")")
+	}
+
+	return b.String()
+}
+
+type sessionIn struct{}
+
+func (in sessionIn) auth() auth          { return none }
+func (in sessionIn) path() string        { return "/common/v1/session" }
+func (in sessionIn) out() (_ sessionOut) { return }
+func (in sessionIn) exprc() string       { return "OK" }
+
+type sessionOut = string
+
+type pingIn struct{}
+
+func (in pingIn) auth() auth       { return check }
+func (in pingIn) path() string     { return "/common/v1/ping" }
+func (in pingIn) out() (_ pingOut) { return }
+func (in pingIn) exprc() string    { return "OK" }
+
+type pingOut struct {
+	AccessLevel string `json:"accessLevel"`
+}
+
+type signUpIn struct{}
+
+func (in signUpIn) auth() auth         { return check }
+func (in signUpIn) path() string       { return "/common/v1/sign_up" }
+func (in signUpIn) out() (_ signUpOut) { return }
+
+type signUpOut = json.RawMessage
+
+type phoneSignUpIn struct {
+	signUpIn
+	Phone string `url:"phone"`
+}
+
+func (in phoneSignUpIn) exprc() string { return "WAITING_CONFIRMATION" }
+
+type passwordSignUpIn struct {
+	signUpIn
+	Password string `url:"password"`
+}
+
+func (in passwordSignUpIn) exprc() string { return "OK" }
+
+type confirmationData struct {
+	SMSBYID string `json:"SMSBYID"`
+}
+
+func (cd confirmationData) EncodeValues(key string, v *url.Values) error {
+	data, err := json.Marshal(cd)
+	if err != nil {
+		return err
+	}
+
+	v.Set(key, string(data))
+	return nil
+}
+
+type confirmIn struct {
+	InitialOperation       string           `url:"initialOperation"`
+	InitialOperationTicket string           `url:"initialOperationTicket"`
+	ConfirmationData       confirmationData `url:"confirmationData"`
+}
+
+func (in confirmIn) auth() auth          { return check }
+func (in confirmIn) path() string        { return "/common/v1/confirm" }
+func (in confirmIn) out() (_ confirmOut) { return }
+func (in confirmIn) exprc() string       { return "OK" }
+
+type confirmOut = json.RawMessage
+
+type levelUpIn struct{}
+
+func (in levelUpIn) auth() auth          { return check }
+func (in levelUpIn) path() string        { return "/common/v1/level_up" }
+func (in levelUpIn) out() (_ levelUpOut) { return }
+func (in levelUpIn) exprc() string       { return "OK" }
+
+type levelUpOut = json.RawMessage
+
 type Currency struct {
 	Code    int    `json:"code"`
 	Name    string `json:"name"`
@@ -51,7 +172,12 @@ type Amount struct {
 	Value    float64  `json:"value"`
 }
 
-type AccountsLightIbIn struct{}
+type accountsLightIbIn struct{}
+
+func (in accountsLightIbIn) auth() auth                  { return force }
+func (in accountsLightIbIn) path() string                { return "/common/v1/accounts_light_ib" }
+func (in accountsLightIbIn) out() (_ AccountsLightIbOut) { return }
+func (in accountsLightIbIn) exprc() string               { return "OK" }
 
 type MultiCardCluster struct {
 	Id string `json:"id"`
@@ -123,6 +249,11 @@ type OperationsIn struct {
 	LoyaltyPaymentProgram  string    `url:"loyaltyPaymentProgram,omitempty"`
 	LoyaltyPaymentStatus   string    `url:"loyaltyPaymentStatus,omitempty"`
 }
+
+func (in OperationsIn) auth() auth             { return force }
+func (in OperationsIn) path() string           { return "/common/v1/operations" }
+func (in OperationsIn) out() (_ OperationsOut) { return }
+func (in OperationsIn) exprc() string          { return "OK" }
 
 type Category struct {
 	Id   string `json:"id"`
@@ -220,6 +351,11 @@ type ShoppingReceiptIn struct {
 	IdSourceType  string    `url:"idSourceType,omitempty"`
 	Account       string    `url:"account,omitempty"`
 }
+
+func (in ShoppingReceiptIn) auth() auth                  { return force }
+func (in ShoppingReceiptIn) path() string                { return "/common/v1/shopping_receipt" }
+func (in ShoppingReceiptIn) out() (_ ShoppingReceiptOut) { return }
+func (in ShoppingReceiptIn) exprc() string               { return "OK" }
 
 type ReceiptItem struct {
 	BrandId  int64   `json:"brand_id"`

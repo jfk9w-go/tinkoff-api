@@ -1,4 +1,4 @@
-package invest
+package tinkoff
 
 import (
 	"context"
@@ -62,47 +62,61 @@ func (d *Date) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type TradeOperationTypesIn struct{}
+type investError struct {
+	ErrorMessage string `json:"errorMessage"`
+	ErrorCode    string `json:"errorCode"`
+}
 
-func (in TradeOperationTypesIn) path() string {
+func (e investError) Error() string {
+	return e.ErrorMessage + " (" + e.ErrorCode + ")"
+}
+
+type investExchange[R any] interface {
+	path() string
+	out() R
+}
+
+type InvestOperationTypesIn struct{}
+
+func (in InvestOperationTypesIn) path() string {
 	return "/invest-gw/ca-operations/api/v1/operations/types"
 }
 
-func (in TradeOperationTypesIn) out() (_ TradeOperationTypesOut) { return }
+func (in InvestOperationTypesIn) out() (_ InvestOperationTypesOut) { return }
 
-type TradeOperationType struct {
+type InvestOperationType struct {
 	Category      string `json:"category"`
 	OperationName string `json:"operationName"`
 	OperationType string `json:"operationType"`
 }
 
-type TradeOperationTypesOut struct {
-	OperationTypes []TradeOperationType `json:"operationTypes"`
+type InvestOperationTypesOut struct {
+	OperationTypes []InvestOperationType `json:"operationTypes"`
 }
 
-type TradeAmount struct {
+type InvestAmount struct {
 	Currency string  `json:"currency"`
 	Value    float64 `json:"value"`
 }
 
-type TradeAccountsIn struct {
+type InvestAccountsIn struct {
 	Currency string `url:"currency" validate:"required"`
 }
 
-func (in TradeAccountsIn) path() string              { return "/invest-gw/invest-portfolio/portfolios/accounts" }
-func (in TradeAccountsIn) out() (_ TradeAccountsOut) { return }
+func (in InvestAccountsIn) path() string               { return "/invest-gw/invest-portfolio/portfolios/accounts" }
+func (in InvestAccountsIn) out() (_ InvestAccountsOut) { return }
 
-type TradeTotals struct {
-	ExpectedAverageYield         TradeAmount `json:"expectedAverageYield"`
-	ExpectedAverageYieldRelative float64     `json:"expectedAverageYieldRelative"`
-	ExpectedYield                TradeAmount `json:"expectedYield"`
-	ExpectedYieldPerDay          TradeAmount `json:"expectedYieldPerDay"`
-	ExpectedYieldPerDayRelative  float64     `json:"expectedYieldPerDayRelative"`
-	ExpectedYieldRelative        float64     `json:"expectedYieldRelative"`
-	TotalAmount                  TradeAmount `json:"totalAmount"`
+type InvestTotals struct {
+	ExpectedAverageYield         InvestAmount `json:"expectedAverageYield"`
+	ExpectedAverageYieldRelative float64      `json:"expectedAverageYieldRelative"`
+	ExpectedYield                InvestAmount `json:"expectedYield"`
+	ExpectedYieldPerDay          InvestAmount `json:"expectedYieldPerDay"`
+	ExpectedYieldPerDayRelative  float64      `json:"expectedYieldPerDayRelative"`
+	ExpectedYieldRelative        float64      `json:"expectedYieldRelative"`
+	TotalAmount                  InvestAmount `json:"totalAmount"`
 }
 
-type TradeAccount struct {
+type InvestAccount struct {
 	AutoApp           bool   `json:"autoApp"`
 	BrokerAccountId   string `json:"brokerAccountId"`
 	BrokerAccountType string `json:"brokerAccountType"`
@@ -114,20 +128,20 @@ type TradeAccount struct {
 	Organization      string `json:"organization"`
 	Status            string `json:"status"`
 
-	TradeTotals
+	InvestTotals
 }
 
-type TradeAccounts struct {
-	Count int            `json:"count"`
-	List  []TradeAccount `json:"list"`
+type InvestAccounts struct {
+	Count int             `json:"count"`
+	List  []InvestAccount `json:"list"`
 }
 
-type TradeAccountsOut struct {
-	Accounts TradeAccounts `json:"accounts"`
-	Totals   TradeTotals   `json:"totals"`
+type InvestAccountsOut struct {
+	Accounts InvestAccounts `json:"accounts"`
+	Totals   InvestTotals   `json:"totals"`
 }
 
-type TradeOperationsIn struct {
+type InvestOperationsIn struct {
 	From               time.Time `url:"from,omitempty" layout:"2006-01-02T15:04:05.999Z"`
 	To                 time.Time `url:"to,omitempty" layout:"2006-01-02T15:04:05.999Z"`
 	BrokerAccountId    string    `url:"brokerAccountId,omitempty"`
@@ -136,13 +150,13 @@ type TradeOperationsIn struct {
 	Cursor             string    `url:"cursor,omitempty"`
 }
 
-func (in TradeOperationsIn) path() string                { return "/invest-gw/ca-operations/api/v1/user/operations" }
-func (in TradeOperationsIn) out() (_ TradeOperationsOut) { return }
+func (in InvestOperationsIn) path() string                 { return "/invest-gw/ca-operations/api/v1/user/operations" }
+func (in InvestOperationsIn) out() (_ InvestOperationsOut) { return }
 
 type Trade struct {
 	Date     DateTimeMilliOffset `json:"date"`
 	Num      string              `json:"num"`
-	Price    TradeAmount         `json:"price"`
+	Price    InvestAmount        `json:"price"`
 	Quantity int                 `json:"quantity"`
 }
 
@@ -151,7 +165,7 @@ type TradesInfo struct {
 	TradesSize int     `json:"tradesSize"`
 }
 
-type TradeOperation struct {
+type InvestOperation struct {
 	AccountId                     string              `json:"accountId"`
 	AccountName                   string              `json:"accountName"`
 	AssetUid                      string              `json:"assetUid"`
@@ -169,12 +183,12 @@ type TradeOperation struct {
 	IsBlockedTradeClearingAccount bool                `json:"isBlockedTradeClearingAccount"`
 	Isin                          string              `json:"isin"`
 	Name                          string              `json:"name"`
-	Payment                       TradeAmount         `json:"payment"`
-	PaymentEur                    TradeAmount         `json:"paymentEur"`
-	PaymentRub                    TradeAmount         `json:"paymentRub"`
-	PaymentUsd                    TradeAmount         `json:"paymentUsd"`
+	Payment                       InvestAmount        `json:"payment"`
+	PaymentEur                    InvestAmount        `json:"paymentEur"`
+	PaymentRub                    InvestAmount        `json:"paymentRub"`
+	PaymentUsd                    InvestAmount        `json:"paymentUsd"`
 	PositionUid                   string              `json:"positionUid"`
-	Price                         *TradeAmount        `json:"price"`
+	Price                         *InvestAmount       `json:"price"`
 	Quantity                      int                 `json:"quantity"`
 	ShortDescription              string              `json:"shortDescription"`
 	ShowName                      string              `json:"showName"`
@@ -185,8 +199,8 @@ type TradeOperation struct {
 	YieldRelative                 float64             `json:"yieldRelative"`
 }
 
-type TradeOperationsOut struct {
-	HasNext    bool             `json:"hasNext"`
-	Items      []TradeOperation `json:"items"`
-	NextCursor string           `json:"nextCursor"`
+type InvestOperationsOut struct {
+	HasNext    bool              `json:"hasNext"`
+	Items      []InvestOperation `json:"items"`
+	NextCursor string            `json:"nextCursor"`
 }
