@@ -3,6 +3,7 @@ package tinkoff
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -62,7 +63,7 @@ func (b ClientBuilder) Build(ctx context.Context) (*Client, error) {
 		return nil, err
 	}
 
-	client := &Client{
+	c := &Client{
 		credential: b.Credential,
 		httpClient: &http.Client{
 			Transport: b.Transport,
@@ -87,9 +88,20 @@ func (b ClientBuilder) Build(ctx context.Context) (*Client, error) {
 		},
 	}
 
-	client.cancel = based.GoWithFeedback(context.Background(), context.WithCancel, client.ping)
+	c.cancel = based.GoWithFeedback(context.Background(), context.WithCancel, func(ctx context.Context) {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			_ = c.ping(ctx)
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	})
 
-	return client, nil
+	return c, nil
 }
 
 type Client struct {
@@ -127,6 +139,18 @@ func (c *Client) ShoppingReceipt(ctx context.Context, in *ShoppingReceiptIn) (*S
 	}
 
 	return &resp.Payload, nil
+}
+
+func (c *Client) InvestOperationTypes(ctx context.Context) (*InvestOperationTypesOut, error) {
+	return executeInvest[InvestOperationTypesOut](ctx, c, investOperationTypesIn{})
+}
+
+func (c *Client) InvestAccounts(ctx context.Context, in *InvestAccountsIn) (*InvestAccountsOut, error) {
+	return executeInvest[InvestAccountsOut](ctx, c, in)
+}
+
+func (c *Client) InvestOperations(ctx context.Context, in *InvestOperationsIn) (*InvestOperationsOut, error) {
+	return executeInvest[InvestOperationsOut](ctx, c, in)
 }
 
 func (c *Client) Close() {
@@ -213,25 +237,27 @@ func (c *Client) authorize(ctx context.Context) (*Session, error) {
 	return session, nil
 }
 
-func (c *Client) ping(ctx context.Context) {
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
-	for {
-		if ctx, cancel := c.mu.Lock(ctx); ctx.Err() == nil {
-			out, err := execute[pingOut](ctx, c, pingIn{})
-			if err == nil && out.Payload.AccessLevel != "CLIENT" {
-				_ = c.resetSessionID(ctx)
-			}
-
-			cancel()
-		}
-
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-		}
+func (c *Client) ping(ctx context.Context) error {
+	ctx, cancel := c.mu.Lock(ctx)
+	defer cancel()
+	if err := ctx.Err(); err != nil {
+		return err
 	}
+
+	out, err := execute[pingOut](ctx, c, pingIn{})
+	if err != nil {
+		return errors.Wrap(err, "ping")
+	}
+
+	if out.Payload.AccessLevel != "CLIENT" {
+		if err := c.resetSessionID(ctx); err != nil {
+			return errors.Wrap(err, "reset sessionid")
+		}
+
+		return errUnauthorized
+	}
+
+	return nil
 }
 
 func execute[R any](ctx context.Context, c *Client, in exchange[R]) (*response[R], error) {
@@ -304,9 +330,14 @@ func execute[R any](ctx context.Context, c *Client, in exchange[R]) (*response[R
 	)
 
 	if httpResp.StatusCode != http.StatusOK {
-		respErr = errors.New(httpResp.Status)
+		if body, err := io.ReadAll(httpResp.Body); err != nil {
+			respErr = errors.New(httpResp.Status)
+		} else {
+			respErr = errors.New(ellipsis(body))
+		}
+
 		retry = &retryStrategy{
-			backOff:    exponentialRetryTimeout(time.Second, 2, 0.5),
+			timeout:    exponentialRetryTimeout(time.Second, 2, 0.5),
 			maxRetries: -1,
 		}
 	} else {
@@ -331,7 +362,7 @@ func execute[R any](ctx context.Context, c *Client, in exchange[R]) (*response[R
 
 		case "REQUEST_RATE_LIMIT_EXCEEDED":
 			retry = &retryStrategy{
-				backOff:    exponentialRetryTimeout(time.Minute, 2, 0.2),
+				timeout:    exponentialRetryTimeout(time.Minute, 2, 0.2),
 				maxRetries: 5,
 			}
 
@@ -341,7 +372,7 @@ func execute[R any](ctx context.Context, c *Client, in exchange[R]) (*response[R
 			}
 
 			retry = &retryStrategy{
-				backOff:    constantRetryTimeout(0),
+				timeout:    constantRetryTimeout(0),
 				maxRetries: 1,
 			}
 		}
@@ -379,7 +410,7 @@ func executeInvest[R any](ctx context.Context, c *Client, in investExchange[R]) 
 		return nil, errors.Wrap(err, "encode url query")
 	}
 
-	urlQuery.Set("sessionid", sessionID)
+	urlQuery.Set("sessionId", sessionID)
 
 	httpReq, err := http.NewRequest(http.MethodGet, baseURL+in.path(), nil)
 	if err != nil {
@@ -387,6 +418,8 @@ func executeInvest[R any](ctx context.Context, c *Client, in investExchange[R]) 
 	}
 
 	httpReq.URL.RawQuery = urlQuery.Encode()
+	httpReq.Header.Set("X-App-Name", "invest")
+	httpReq.Header.Set("X-App-Version", "1.328.0")
 
 	httpResp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -399,5 +432,57 @@ func executeInvest[R any](ctx context.Context, c *Client, in investExchange[R]) 
 
 	defer httpResp.Body.Close()
 
-	panic("not implemented")
+	switch {
+	case httpResp.StatusCode == http.StatusOK:
+		var resp R
+		if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
+			return nil, errors.Wrap(err, "unmarshal response body")
+		}
+
+		return &resp, nil
+
+	case httpResp.StatusCode >= 400 && httpResp.StatusCode < 600:
+		var investErr investError
+		if body, err := io.ReadAll(httpResp.Body); err != nil {
+			return nil, errors.New(httpResp.Status)
+		} else if err := json.Unmarshal(body, &investErr); err != nil {
+			return nil, errors.New(ellipsis(body))
+		} else {
+			if investErr.ErrorCode == "404" {
+				// this may be due to expired sessionid, try to check it
+				if err := c.ping(ctx); errors.Is(err, errUnauthorized) {
+					retry := &retryStrategy{
+						timeout:    constantRetryTimeout(0),
+						maxRetries: 1,
+					}
+
+					ctx, err := retry.do(ctx)
+					if err != nil {
+						return nil, investErr
+					}
+
+					if _, err := c.authorize(ctx); err != nil {
+						return nil, errors.Wrap(err, "authorize")
+					}
+
+					return executeInvest[R](ctx, c, in)
+				}
+			}
+
+			return nil, investErr
+		}
+
+	default:
+		_, _ = io.Copy(io.Discard, httpResp.Body)
+		return nil, errors.New(httpResp.Status)
+	}
+}
+
+func ellipsis(data []byte) string {
+	str := string(data)
+	if len(str) > 200 {
+		return str + "..."
+	}
+
+	return str
 }

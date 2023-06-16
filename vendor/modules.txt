@@ -1,0 +1,30 @@
+# github.com/caarlos0/env v3.5.0+incompatible
+## explicit
+github.com/caarlos0/env
+# github.com/davecgh/go-spew v1.1.1
+## explicit
+github.com/davecgh/go-spew/spew
+# github.com/go-playground/locales v0.14.1
+## explicit; go 1.17
+github.com/go-playground/locales
+github.com/go-playground/locales/currency
+# github.com/go-playground/universal-translator v0.18.1
+## explicit; go 1.18
+github.com/go-playground/universal-translator
+# github.com/go-playground/validator v9.31.0+incompatible
+## explicit
+github.com/go-playground/validator
+# github.com/google/go-querystring v1.1.0
+## explicit; go 1.10
+github.com/google/go-querystring/query
+# github.com/jfk9w-go/based v0.0.0-20230616102557-1633c015cd56
+## explicit; go 1.20
+github.com/jfk9w-go/based
+# github.com/leodido/go-urn v1.2.4
+## explicit; go 1.16
+github.com/leodido/go-urn
+# github.com/pkg/errors v0.9.1
+## explicit
+github.com/pkg/errors
+# gopkg.in/go-playground/assert.v1 v1.2.1
+## explicit

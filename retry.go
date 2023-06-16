@@ -10,7 +10,7 @@ import (
 type retryKey struct{}
 
 type retryStrategy struct {
-	backOff    retryTimeoutFunc
+	timeout    retryTimeoutFunc
 	maxRetries int
 }
 
@@ -21,7 +21,7 @@ func (rs *retryStrategy) do(ctx context.Context) (context.Context, error) {
 	}
 
 	select {
-	case <-time.After(rs.backOff(retry)):
+	case <-time.After(rs.timeout(retry)):
 		return context.WithValue(ctx, retryKey{}, retry+1), nil
 	case <-ctx.Done():
 		return ctx, ctx.Err()

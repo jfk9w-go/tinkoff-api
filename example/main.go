@@ -139,6 +139,49 @@ func main() {
 
 	defer client.Close()
 
+	investOperationTypes, err := client.InvestOperationTypes(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("found %d invest operation types\n", len(investOperationTypes.OperationsTypes))
+	for _, operationType := range investOperationTypes.OperationsTypes {
+		spew.Dump(operationType)
+		break
+	}
+
+	investAccounts, err := client.InvestAccounts(ctx, &tinkoff.InvestAccountsIn{
+		Currency: "RUB",
+	})
+
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("found %d invest accounts\n", investAccounts.Accounts.Count)
+	for _, account := range investAccounts.Accounts.List {
+		spew.Dump(account)
+
+		investOperations, err := client.InvestOperations(ctx, &tinkoff.InvestOperationsIn{
+			From:            time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+			To:              time.Now(),
+			Limit:           10,
+			BrokerAccountId: account.BrokerAccountId,
+		})
+
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Printf("found %d invest operations in invest account '%s'\n", len(investOperations.Items), account.Name)
+		for _, operation := range investOperations.Items {
+			spew.Dump(operation)
+			break
+		}
+
+		break
+	}
+
 	accounts, err := client.AccountsLightIb(ctx)
 	if err != nil {
 		panic(err)

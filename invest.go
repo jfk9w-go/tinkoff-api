@@ -76,13 +76,13 @@ type investExchange[R any] interface {
 	out() R
 }
 
-type InvestOperationTypesIn struct{}
+type investOperationTypesIn struct{}
 
-func (in InvestOperationTypesIn) path() string {
+func (in investOperationTypesIn) path() string {
 	return "/invest-gw/ca-operations/api/v1/operations/types"
 }
 
-func (in InvestOperationTypesIn) out() (_ InvestOperationTypesOut) { return }
+func (in investOperationTypesIn) out() (_ InvestOperationTypesOut) { return }
 
 type InvestOperationType struct {
 	Category      string `json:"category"`
@@ -91,7 +91,7 @@ type InvestOperationType struct {
 }
 
 type InvestOperationTypesOut struct {
-	OperationTypes []InvestOperationType `json:"operationTypes"`
+	OperationsTypes []InvestOperationType `json:"operationsTypes"`
 }
 
 type InvestAmount struct {
@@ -166,7 +166,6 @@ type TradesInfo struct {
 }
 
 type InvestOperation struct {
-	AccountId                     string              `json:"accountId"`
 	AccountName                   string              `json:"accountName"`
 	AssetUid                      string              `json:"assetUid"`
 	BestExecuted                  bool                `json:"bestExecuted"`
