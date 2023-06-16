@@ -23,5 +23,5 @@
 кэширования информации о сессии (и потенциального дальнейшего переиспользования).
 
 ```bash
-TINKOFF_PHONE="79999999999" TINKOFF_PASSWORD="123456" TINKOFF_SESSIONS_FILE="/tmp/tinkoff-sessions.json" go run example/main.go 
+TINKOFF_PHONE="+79999999999" TINKOFF_PASSWORD="123456" TINKOFF_SESSIONS_FILE="/tmp/tinkoff-sessions.json" go run example/main.go 
 ```
