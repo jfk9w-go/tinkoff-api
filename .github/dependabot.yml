@@ -1,0 +1,12 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - deps
+    assignees:
+      - jfk9w
+    reviewers:
+      - jfk9w
