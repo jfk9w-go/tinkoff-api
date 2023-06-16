@@ -7,7 +7,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/go-playground/validator v9.31.0+incompatible
 	github.com/google/go-querystring v1.1.0
-	github.com/jfk9w-go/based v0.0.0-20230616110137-8393cebea913
+	github.com/jfk9w-go/based v0.0.0-20230616110516-38f4c5c23679
 	github.com/pkg/errors v0.9.1
 )
 

@@ -17,7 +17,7 @@ github.com/go-playground/validator
 # github.com/google/go-querystring v1.1.0
 ## explicit; go 1.10
 github.com/google/go-querystring/query
-# github.com/jfk9w-go/based v0.0.0-20230616110137-8393cebea913
+# github.com/jfk9w-go/based v0.0.0-20230616110516-38f4c5c23679
 ## explicit; go 1.20
 github.com/jfk9w-go/based
 # github.com/leodido/go-urn v1.2.4
