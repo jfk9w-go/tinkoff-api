@@ -13,7 +13,7 @@ import (
 	"github.com/caarlos0/env"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jfk9w-go/based"
-	"github.com/jkf9w-go/tinkoff-api"
+	"github.com/jfk9w-go/tinkoff-api"
 	"github.com/pkg/errors"
 )
 
