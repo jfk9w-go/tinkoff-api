@@ -1,11 +1,191 @@
 package tinkoff
 
 import (
+	"context"
 	"encoding/json"
+	"io"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/google/go-querystring/query"
+	"github.com/pkg/errors"
 )
+
+type auth int
+
+const (
+	none auth = iota
+	check
+	force
+)
+
+type commonExchange[R any] interface {
+	auth() auth
+	path() string
+	out() R
+	exprc() string
+}
+
+type commonResponse[R any] struct {
+	ResultCode      string `json:"resultCode"`
+	ErrorMessage    string `json:"errorMessage"`
+	Payload         R      `json:"payload"`
+	OperationTicket string `json:"operationTicket"`
+}
+
+type resultCodeError struct {
+	expected, actual string
+	message          string
+}
+
+func (e resultCodeError) Error() string {
+	var b strings.Builder
+	b.WriteString(e.actual)
+	b.WriteString(" != ")
+	b.WriteString(e.expected)
+	if e.message != "" {
+		b.WriteString(" (")
+		b.WriteString(e.message)
+		b.WriteString(")")
+	}
+
+	return b.String()
+}
+
+func executeCommon[R any](ctx context.Context, c *Client, in commonExchange[R]) (*commonResponse[R], error) {
+	var sessionID string
+	if in.auth() != none {
+		var (
+			cancel context.CancelFunc
+			err    error
+		)
+
+		ctx, cancel = c.mu.Lock(ctx)
+		defer cancel()
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		switch in.auth() {
+		case force:
+			sessionID, err = c.ensureSessionID(ctx)
+		case check:
+			sessionID, err = c.getSessionID(ctx)
+		default:
+			return nil, errors.Errorf("unsupported auth %v", in.auth())
+		}
+
+		if err != nil {
+			return nil, errors.Wrap(err, "get sessionid")
+		}
+	}
+
+	ctx, cancel := c.rateLimiter(in.path()).Lock(ctx)
+	defer cancel()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	reqBody, err := query.Values(in)
+	if err != nil {
+		return nil, errors.Wrap(err, "encode form values")
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+in.path(), strings.NewReader(reqBody.Encode()))
+	if err != nil {
+		return nil, errors.Wrap(err, "create request")
+	}
+
+	urlQuery := make(url.Values)
+	urlQuery.Set("origin", "web,ib5,platform")
+	if sessionID != "" {
+		urlQuery.Set("sessionid", sessionID)
+	}
+
+	httpReq.URL.RawQuery = urlQuery.Encode()
+	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	httpResp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, errors.Wrap(err, "execute request")
+	}
+
+	if httpResp.Body == nil {
+		return nil, errors.New(httpResp.Status)
+	}
+
+	defer httpResp.Body.Close()
+
+	var (
+		respErr error
+		retry   *retryStrategy
+	)
+
+	if httpResp.StatusCode != http.StatusOK {
+		if body, err := io.ReadAll(httpResp.Body); err != nil {
+			respErr = errors.New(httpResp.Status)
+		} else {
+			respErr = errors.New(ellipsis(body))
+		}
+
+		retry = &retryStrategy{
+			timeout:    exponentialRetryTimeout(time.Second, 2, 0.5),
+			maxRetries: -1,
+		}
+	} else {
+		var resp commonResponse[R]
+		if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
+			return nil, errors.Wrap(err, "decode response body")
+		}
+
+		if in.exprc() == resp.ResultCode {
+			return &resp, nil
+		}
+
+		respErr = resultCodeError{
+			actual:   resp.ResultCode,
+			expected: in.exprc(),
+			message:  resp.ErrorMessage,
+		}
+
+		switch resp.ResultCode {
+		case "NO_DATA_FOUND":
+			return nil, ErrNoDataFound
+
+		case "REQUEST_RATE_LIMIT_EXCEEDED":
+			retry = &retryStrategy{
+				timeout:    exponentialRetryTimeout(time.Minute, 2, 0.2),
+				maxRetries: 5,
+			}
+
+		case "INSUFFICIENT_PRIVILEGES":
+			if _, err := c.authorize(ctx); err != nil {
+				return nil, errors.Wrap(err, "authorize")
+			}
+
+			retry = &retryStrategy{
+				timeout:    constantRetryTimeout(0),
+				maxRetries: 1,
+			}
+		}
+	}
+
+	if retry != nil {
+		ctx, retryErr := retry.do(ctx)
+		switch {
+		case errors.Is(retryErr, errMaxRetriesExceeded):
+			// fallthrough
+		case retryErr != nil:
+			return nil, retryErr
+		default:
+			return executeCommon[R](ctx, c, in)
+		}
+	}
+
+	return nil, respErr
+}
 
 type Milliseconds time.Time
 
@@ -40,47 +220,6 @@ func (s *Seconds) UnmarshalJSON(data []byte) error {
 
 	*s = Seconds(time.Unix(value, 0))
 	return nil
-}
-
-type auth int
-
-const (
-	none auth = iota
-	check
-	force
-)
-
-type exchange[R any] interface {
-	auth() auth
-	path() string
-	out() R
-	exprc() string
-}
-
-type response[R any] struct {
-	ResultCode      string `json:"resultCode"`
-	ErrorMessage    string `json:"errorMessage"`
-	Payload         R      `json:"payload"`
-	OperationTicket string `json:"operationTicket"`
-}
-
-type resultCodeError struct {
-	expected, actual string
-	message          string
-}
-
-func (e resultCodeError) Error() string {
-	var b strings.Builder
-	b.WriteString(e.actual)
-	b.WriteString(" != ")
-	b.WriteString(e.expected)
-	if e.message != "" {
-		b.WriteString(" (")
-		b.WriteString(e.message)
-		b.WriteString(")")
-	}
-
-	return b.String()
 }
 
 type sessionIn struct{}
