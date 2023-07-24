@@ -13,6 +13,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	shoppingReceiptPath = "/common/v1/shopping_receipt"
+)
+
 type auth int
 
 const (
@@ -439,47 +443,48 @@ type SpendingCategory struct {
 }
 
 type Operation struct {
-	Account                string         `json:"account"`
-	AccountAmount          Amount         `json:"accountAmount"`
-	Amount                 Amount         `json:"amount"`
-	AuthorizationId        string         `json:"authorizationId"`
-	Card                   string         `json:"card"`
-	CardNumber             string         `json:"cardNumber"`
-	CardPresent            bool           `json:"cardPresent"`
-	Cashback               float64        `json:"cashback"`
-	CashbackAmount         Amount         `json:"cashbackAmount"`
-	Category               Category       `json:"category"`
-	Compensation           string         `json:"compensation"`
-	DebitingTime           Milliseconds   `json:"debitingTime"`
-	Description            string         `json:"description"`
-	Group                  string         `json:"group"`
-	HasShoppingReceipt     bool           `json:"hasShoppingReceipt"`
-	HasStatement           bool           `json:"hasStatement"`
-	Id                     string         `json:"id"`
-	IdSourceType           string         `json:"idSourceType"`
-	InstallmentStatus      string         `json:"installmentStatus"`
-	IsDispute              bool           `json:"isDispute"`
-	IsExternalCard         bool           `json:"isExternalCard"`
-	IsHce                  bool           `json:"isHce"`
-	IsInner                bool           `json:"isInner"`
-	IsOffline              bool           `json:"isOffline"`
-	IsSuspicious           bool           `json:"isSuspicious"`
-	IsTemplatable          bool           `json:"isTemplatable"`
-	Locations              []Location     `json:"locations"`
-	LoyaltyBonus           []LoyaltyBonus `json:"loyaltyBonus"`
-	Mcc                    int            `json:"mcc"`
-	MccString              string         `json:"mccString"`
-	Merchant               Merchant       `json:"merchant"`
-	OperationTime          Milliseconds   `json:"operationTime"`
-	OperationTransferred   bool           `json:"operationTransferred"`
-	PointOfSaleId          int64          `json:"pointOfSaleId"`
-	PosId                  string         `json:"posId"`
-	Status                 string         `json:"status"`
-	TrancheCreationAllowed bool           `json:"trancheCreationAllowed"`
-	Type                   string         `json:"type"`
-	TypeSerno              int64          `json:"typeSerno"`
-	Ucid                   string         `json:"ucid"`
-	VirtualPaymentType     int            `json:"virtualPaymentType"`
+	Account                string           `json:"account"`
+	AccountAmount          Amount           `json:"accountAmount"`
+	Amount                 Amount           `json:"amount"`
+	AuthorizationId        string           `json:"authorizationId"`
+	Card                   string           `json:"card"`
+	CardNumber             string           `json:"cardNumber"`
+	CardPresent            bool             `json:"cardPresent"`
+	Cashback               float64          `json:"cashback"`
+	CashbackAmount         Amount           `json:"cashbackAmount"`
+	Category               Category         `json:"category"`
+	Compensation           string           `json:"compensation"`
+	DebitingTime           Milliseconds     `json:"debitingTime"`
+	Description            string           `json:"description"`
+	Group                  string           `json:"group"`
+	HasShoppingReceipt     bool             `json:"hasShoppingReceipt"`
+	HasStatement           bool             `json:"hasStatement"`
+	Id                     string           `json:"id"`
+	IdSourceType           string           `json:"idSourceType"`
+	InstallmentStatus      string           `json:"installmentStatus"`
+	IsDispute              bool             `json:"isDispute"`
+	IsExternalCard         bool             `json:"isExternalCard"`
+	IsHce                  bool             `json:"isHce"`
+	IsInner                bool             `json:"isInner"`
+	IsOffline              bool             `json:"isOffline"`
+	IsSuspicious           bool             `json:"isSuspicious"`
+	IsTemplatable          bool             `json:"isTemplatable"`
+	Locations              []Location       `json:"locations"`
+	LoyaltyBonus           []LoyaltyBonus   `json:"loyaltyBonus"`
+	Mcc                    int              `json:"mcc"`
+	MccString              string           `json:"mccString"`
+	Merchant               Merchant         `json:"merchant"`
+	OperationTime          Milliseconds     `json:"operationTime"`
+	OperationTransferred   bool             `json:"operationTransferred"`
+	PointOfSaleId          int64            `json:"pointOfSaleId"`
+	PosId                  string           `json:"posId"`
+	SpendingCategory       SpendingCategory `json:"spendingCategory"`
+	Status                 string           `json:"status"`
+	TrancheCreationAllowed bool             `json:"trancheCreationAllowed"`
+	Type                   string           `json:"type"`
+	TypeSerno              int64            `json:"typeSerno"`
+	Ucid                   string           `json:"ucid"`
+	VirtualPaymentType     int              `json:"virtualPaymentType"`
 }
 
 type OperationsOut = []Operation
@@ -492,7 +497,7 @@ type ShoppingReceiptIn struct {
 }
 
 func (in ShoppingReceiptIn) auth() auth                  { return force }
-func (in ShoppingReceiptIn) path() string                { return "/common/v1/shopping_receipt" }
+func (in ShoppingReceiptIn) path() string                { return shoppingReceiptPath }
 func (in ShoppingReceiptIn) out() (_ ShoppingReceiptOut) { return }
 func (in ShoppingReceiptIn) exprc() string               { return "OK" }
 

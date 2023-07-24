@@ -72,7 +72,7 @@ func (b ClientBuilder) Build(ctx context.Context) (*Client, error) {
 			b.Credential.Phone,
 		),
 		rateLimiters: map[string]based.Locker{
-			ShoppingReceiptIn{}.path(): based.Lockers{
+			shoppingReceiptPath: based.Lockers{
 				based.Semaphore(b.Clock, 25, 75*time.Second),
 				based.Semaphore(b.Clock, 75, 11*time.Minute),
 			},
