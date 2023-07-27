@@ -2,10 +2,15 @@ package tinkoff
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-playground/validator"
+	"github.com/google/go-querystring/query"
 	"github.com/jfk9w-go/based"
 	"github.com/pkg/errors"
 )
@@ -249,4 +254,230 @@ func (c *Client) ping(ctx context.Context) error {
 	}
 
 	return nil
+}
+func executeInvest[R any](ctx context.Context, c *Client, in investExchange[R]) (*R, error) {
+	ctx, cancel := c.mu.Lock(ctx)
+	defer cancel()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	sessionID, err := c.ensureSessionID(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "ensure sessionid")
+	}
+
+	urlQuery, err := query.Values(in)
+	if err != nil {
+		return nil, errors.Wrap(err, "encode url query")
+	}
+
+	urlQuery.Set("sessionId", sessionID)
+
+	httpReq, err := http.NewRequest(http.MethodGet, baseURL+in.path(), nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "create http request")
+	}
+
+	httpReq.URL.RawQuery = urlQuery.Encode()
+	httpReq.Header.Set("X-App-Name", "invest")
+	httpReq.Header.Set("X-App-Version", "1.328.0")
+
+	httpResp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, errors.Wrap(err, "execute request")
+	}
+
+	if httpResp.Body == nil {
+		return nil, errors.New(httpResp.Status)
+	}
+
+	defer httpResp.Body.Close()
+
+	switch {
+	case httpResp.StatusCode == http.StatusOK:
+		var resp R
+		if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
+			return nil, errors.Wrap(err, "unmarshal response body")
+		}
+
+		return &resp, nil
+
+	case httpResp.StatusCode >= 400 && httpResp.StatusCode < 600:
+		var investErr investError
+		if body, err := io.ReadAll(httpResp.Body); err != nil {
+			return nil, errors.New(httpResp.Status)
+		} else if err := json.Unmarshal(body, &investErr); err != nil {
+			return nil, errors.New(ellipsis(body))
+		} else {
+			if investErr.ErrorCode == "404" {
+				// this may be due to expired sessionid, try to check it
+				if err := c.ping(ctx); errors.Is(err, errUnauthorized) {
+					retry := &retryStrategy{
+						timeout:    constantRetryTimeout(0),
+						maxRetries: 1,
+					}
+
+					ctx, err := retry.do(ctx)
+					if err != nil {
+						return nil, investErr
+					}
+
+					if _, err := c.authorize(ctx); err != nil {
+						return nil, errors.Wrap(err, "authorize")
+					}
+
+					return executeInvest[R](ctx, c, in)
+				}
+			}
+
+			return nil, investErr
+		}
+
+	default:
+		_, _ = io.Copy(io.Discard, httpResp.Body)
+		return nil, errors.New(httpResp.Status)
+	}
+}
+
+func ellipsis(data []byte) string {
+	str := string(data)
+	if len(str) > 200 {
+		return str + "..."
+	}
+
+	return str
+}
+
+func executeCommon[R any](ctx context.Context, c *Client, in commonExchange[R]) (*commonResponse[R], error) {
+	var sessionID string
+	if in.auth() != none {
+		var (
+			cancel context.CancelFunc
+			err    error
+		)
+
+		ctx, cancel = c.mu.Lock(ctx)
+		defer cancel()
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		switch in.auth() {
+		case force:
+			sessionID, err = c.ensureSessionID(ctx)
+		case check:
+			sessionID, err = c.getSessionID(ctx)
+		default:
+			return nil, errors.Errorf("unsupported auth %v", in.auth())
+		}
+
+		if err != nil {
+			return nil, errors.Wrap(err, "get sessionid")
+		}
+	}
+
+	ctx, cancel := c.rateLimiter(in.path()).Lock(ctx)
+	defer cancel()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	reqBody, err := query.Values(in)
+	if err != nil {
+		return nil, errors.Wrap(err, "encode form values")
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+in.path(), strings.NewReader(reqBody.Encode()))
+	if err != nil {
+		return nil, errors.Wrap(err, "create request")
+	}
+
+	urlQuery := make(url.Values)
+	urlQuery.Set("origin", "web,ib5,platform")
+	if sessionID != "" {
+		urlQuery.Set("sessionid", sessionID)
+	}
+
+	httpReq.URL.RawQuery = urlQuery.Encode()
+	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	httpResp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, errors.Wrap(err, "execute request")
+	}
+
+	if httpResp.Body == nil {
+		return nil, errors.New(httpResp.Status)
+	}
+
+	defer httpResp.Body.Close()
+
+	var (
+		respErr error
+		retry   *retryStrategy
+	)
+
+	if httpResp.StatusCode != http.StatusOK {
+		if body, err := io.ReadAll(httpResp.Body); err != nil {
+			respErr = errors.New(httpResp.Status)
+		} else {
+			respErr = errors.New(ellipsis(body))
+		}
+
+		retry = &retryStrategy{
+			timeout:    exponentialRetryTimeout(time.Second, 2, 0.5),
+			maxRetries: -1,
+		}
+	} else {
+		var resp commonResponse[R]
+		if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
+			return nil, errors.Wrap(err, "decode response body")
+		}
+
+		if in.exprc() == resp.ResultCode {
+			return &resp, nil
+		}
+
+		respErr = resultCodeError{
+			actual:   resp.ResultCode,
+			expected: in.exprc(),
+			message:  resp.ErrorMessage,
+		}
+
+		switch resp.ResultCode {
+		case "NO_DATA_FOUND":
+			return nil, ErrNoDataFound
+
+		case "REQUEST_RATE_LIMIT_EXCEEDED":
+			retry = &retryStrategy{
+				timeout:    exponentialRetryTimeout(time.Minute, 2, 0.2),
+				maxRetries: 5,
+			}
+
+		case "INSUFFICIENT_PRIVILEGES":
+			if _, err := c.authorize(ctx); err != nil {
+				return nil, errors.Wrap(err, "authorize")
+			}
+
+			retry = &retryStrategy{
+				timeout:    constantRetryTimeout(0),
+				maxRetries: 1,
+			}
+		}
+	}
+
+	if retry != nil {
+		ctx, retryErr := retry.do(ctx)
+		switch {
+		case errors.Is(retryErr, errMaxRetriesExceeded):
+			// fallthrough
+		case retryErr != nil:
+			return nil, retryErr
+		default:
+			return executeCommon[R](ctx, c, in)
+		}
+	}
+
+	return nil, respErr
 }

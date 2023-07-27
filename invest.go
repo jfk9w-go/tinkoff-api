@@ -3,11 +3,7 @@ package tinkoff
 import (
 	"context"
 	"encoding/json"
-	"io"
-	"net/http"
 	"time"
-
-	"github.com/google/go-querystring/query"
 
 	"github.com/jfk9w-go/based"
 	"github.com/pkg/errors"
@@ -25,100 +21,6 @@ func (e investError) Error() string {
 type investExchange[R any] interface {
 	path() string
 	out() R
-}
-
-func executeInvest[R any](ctx context.Context, c *Client, in investExchange[R]) (*R, error) {
-	ctx, cancel := c.mu.Lock(ctx)
-	defer cancel()
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-
-	sessionID, err := c.ensureSessionID(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "ensure sessionid")
-	}
-
-	urlQuery, err := query.Values(in)
-	if err != nil {
-		return nil, errors.Wrap(err, "encode url query")
-	}
-
-	urlQuery.Set("sessionId", sessionID)
-
-	httpReq, err := http.NewRequest(http.MethodGet, baseURL+in.path(), nil)
-	if err != nil {
-		return nil, errors.Wrap(err, "create http request")
-	}
-
-	httpReq.URL.RawQuery = urlQuery.Encode()
-	httpReq.Header.Set("X-App-Name", "invest")
-	httpReq.Header.Set("X-App-Version", "1.328.0")
-
-	httpResp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, errors.Wrap(err, "execute request")
-	}
-
-	if httpResp.Body == nil {
-		return nil, errors.New(httpResp.Status)
-	}
-
-	defer httpResp.Body.Close()
-
-	switch {
-	case httpResp.StatusCode == http.StatusOK:
-		var resp R
-		if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
-			return nil, errors.Wrap(err, "unmarshal response body")
-		}
-
-		return &resp, nil
-
-	case httpResp.StatusCode >= 400 && httpResp.StatusCode < 600:
-		var investErr investError
-		if body, err := io.ReadAll(httpResp.Body); err != nil {
-			return nil, errors.New(httpResp.Status)
-		} else if err := json.Unmarshal(body, &investErr); err != nil {
-			return nil, errors.New(ellipsis(body))
-		} else {
-			if investErr.ErrorCode == "404" {
-				// this may be due to expired sessionid, try to check it
-				if err := c.ping(ctx); errors.Is(err, errUnauthorized) {
-					retry := &retryStrategy{
-						timeout:    constantRetryTimeout(0),
-						maxRetries: 1,
-					}
-
-					ctx, err := retry.do(ctx)
-					if err != nil {
-						return nil, investErr
-					}
-
-					if _, err := c.authorize(ctx); err != nil {
-						return nil, errors.Wrap(err, "authorize")
-					}
-
-					return executeInvest[R](ctx, c, in)
-				}
-			}
-
-			return nil, investErr
-		}
-
-	default:
-		_, _ = io.Copy(io.Discard, httpResp.Body)
-		return nil, errors.New(httpResp.Status)
-	}
-}
-
-func ellipsis(data []byte) string {
-	str := string(data)
-	if len(str) > 200 {
-		return str + "..."
-	}
-
-	return str
 }
 
 type DateTimeMilliOffset time.Time

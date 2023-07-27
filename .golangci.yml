@@ -1,0 +1,4 @@
+run:
+  skip-files:
+    - common.go
+    - invest.go
