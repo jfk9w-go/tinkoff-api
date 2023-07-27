@@ -180,7 +180,7 @@ func main() {
 			break
 		}
 
-		break
+		break //nolint:staticcheck
 	}
 
 	accounts, err := client.AccountsLightIb(ctx)
