@@ -17,8 +17,12 @@ jobs:
         with:
           go-version: stable
       - name: Build
-        run: go build -v ./...
+        run: make build
+      - name: Lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.53
       - name: Test
-        run: go test -v ./...
+        run: make test
       - name: Update test coverage
         uses: ncruces/go-coverage-report@main

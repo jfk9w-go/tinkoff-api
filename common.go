@@ -381,7 +381,7 @@ type Account struct {
 	Status                string       `json:"status"`
 }
 
-type AccountsLightIbOut []Account
+type AccountsLightIbOut = []Account
 
 type OperationsIn struct {
 	Account                string    `url:"account" validate:"required"`
