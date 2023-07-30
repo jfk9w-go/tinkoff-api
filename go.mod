@@ -3,6 +3,7 @@ module github.com/jfk9w-go/tinkoff-api
 go 1.20
 
 require (
+	github.com/AlekSi/pointer v1.2.0
 	github.com/caarlos0/env v3.5.0+incompatible
 	github.com/davecgh/go-spew v1.1.1
 	github.com/go-playground/validator v9.31.0+incompatible

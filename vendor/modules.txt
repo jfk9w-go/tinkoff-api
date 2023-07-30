@@ -1,3 +1,6 @@
+# github.com/AlekSi/pointer v1.2.0
+## explicit; go 1.18
+github.com/AlekSi/pointer
 # github.com/caarlos0/env v3.5.0+incompatible
 ## explicit
 github.com/caarlos0/env

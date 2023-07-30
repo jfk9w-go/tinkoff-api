@@ -58,6 +58,15 @@ func (ms Milliseconds) Time() time.Time {
 	return time.Time(ms)
 }
 
+func (ms Milliseconds) MarshalJSON() ([]byte, error) {
+	var value struct {
+		Milliseconds int64 `json:"milliseconds"`
+	}
+
+	value.Milliseconds = ms.Time().UnixMilli()
+	return json.Marshal(value)
+}
+
 func (ms *Milliseconds) UnmarshalJSON(data []byte) error {
 	var value struct {
 		Milliseconds int64 `json:"milliseconds"`
@@ -75,6 +84,10 @@ type Seconds time.Time
 
 func (s Seconds) Time() time.Time {
 	return time.Time(s)
+}
+
+func (s Seconds) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.Time().Unix())
 }
 
 func (s *Seconds) UnmarshalJSON(data []byte) error {
@@ -166,12 +179,12 @@ func (in levelUpIn) exprc() string       { return "OK" }
 type levelUpOut = json.RawMessage
 
 type Currency struct {
-	Code    int    `json:"code"`
+	Code    uint   `json:"code"`
 	Name    string `json:"name"`
 	StrCode string `json:"strCode"`
 }
 
-type Amount struct {
+type MoneyAmount struct {
 	Currency Currency `json:"currency"`
 	Value    float64  `json:"value"`
 }
@@ -188,70 +201,92 @@ type MultiCardCluster struct {
 }
 
 type Card struct {
-	CreationDate     Milliseconds     `json:"creationDate"`
-	Expiration       Milliseconds     `json:"expiration"`
-	FrozenCard       bool             `json:"frozenCard"`
-	HasWrongPins     bool             `json:"hasWrongPins"`
-	Id               string           `json:"id"`
-	IsEmbossed       string           `json:"isEmbossed"`
-	IsPaymentDevice  bool             `json:"isPaymentDevice"`
-	IsVirtual        string           `json:"isVirtual"`
-	MultiCardCluster MultiCardCluster `json:"multiCardCluster"`
-	Name             string           `json:"name"`
-	PaymentSystem    string           `json:"paymentSystem"`
-	PinSec           bool             `json:"pinSec"`
-	Primary          bool             `json:"primary"`
-	Status           string           `json:"status"`
-	StatusCode       string           `json:"statusCode"`
-	Ucid             string           `json:"ucid"`
-	Value            string           `json:"value"`
+	Id               string            `json:"id"`
+	StatusCode       string            `json:"statusCode"`
+	Status           string            `json:"status"`
+	PinSet           bool              `json:"pinSet"`
+	Expiration       Milliseconds      `json:"expiration"`
+	CardDesign       string            `json:"cardDesign"`
+	Ucid             string            `json:"ucid"`
+	PaymentSystem    string            `json:"paymentSystem"`
+	FrozenCard       bool              `json:"frozenCard"`
+	HasWrongPins     bool              `json:"hasWrongPins"`
+	Value            string            `json:"value"`
+	IsEmbossed       bool              `json:"isEmbossed"`
+	IsVirtual        bool              `json:"isVirtual"`
+	CreationDate     Milliseconds      `json:"creationDate"`
+	MultiCardCluster *MultiCardCluster `json:"multiCardCluster,omitempty"`
+	Name             string            `json:"name"`
+	IsPaymentDevice  bool              `json:"isPaymentDevice"`
+	Primary          bool              `json:"primary"`
+	CardIssueType    string            `json:"cardIssueType"`
+	SharedResourceId *string           `json:"sharedResourceId,omitempty"`
 }
 
 type Loyalty struct {
-	AccrualBonuses        float64 `json:"accrualBonuses"`
-	AvailableBonuses      float64 `json:"availableBonuses"`
-	CashbackProgram       bool    `json:"cashbackProgram"`
-	CoreGroup             string  `json:"coreGroup"`
-	LinkedBonuses         string  `json:"linkedBonuses"`
-	LoyaltyPointsId       int64   `json:"loyaltyPointsId"`
-	ProgramCode           string  `json:"programCode"`
-	TotalAvailableBonuses float64 `json:"totalAvailableBonuses"`
+	ProgramName            string   `json:"programName"`
+	ProgramCode            string   `json:"programCode"`
+	AccountBackgroundColor string   `json:"accountBackgroundColor"`
+	CashbackProgram        bool     `json:"cashbackProgram"`
+	CoreGroup              string   `json:"coreGroup"`
+	LoyaltyPointsId        uint8    `json:"loyaltyPointsId"`
+	AccrualBonuses         *float64 `json:"accrualBonuses,omitempty"`
+	LinkedBonuses          *string  `json:"linkedBonuses,omitempty"`
+	TotalAvailableBonuses  *float64 `json:"totalAvailableBonuses,omitempty"`
+	AvailableBonuses       *float64 `json:"availableBonuses,omitempty"`
+}
+
+type AccountShared struct {
+	Scopes     []string     `json:"scopes"`
+	StartDate  Milliseconds `json:"startDate"`
+	OwnerName  string       `json:"ownerName"`
+	SharStatus string       `json:"sharStatus"`
 }
 
 type Account struct {
-	AccountType           string       `json:"accountType"`
-	Cards                 []Card       `json:"cards"`
-	ClientUnverifiedFlag  string       `json:"clientUnverifiedFlag"`
-	CreationDate          Milliseconds `json:"creationDate"`
-	CreditLimit           *Amount      `json:"creditLimit"`
-	Currency              Currency     `json:"currency"`
-	CurrentMinimalPayment *Amount      `json:"currentMinimalPayment"`
-	DebtAmount            *Amount      `json:"debtAmount"`
-	DueDate               Milliseconds `json:"dueDate"`
-	Hidden                bool         `json:"hidden"`
-	Id                    string       `json:"id"`
-	LastStatementDate     Milliseconds `json:"lastStatementDate"`
-	Loyalty               *Loyalty     `json:"loyalty"`
-	LoyaltyId             string       `json:"loyaltyId"`
-	MoneyAmount           *Amount      `json:"moneyAmount"`
-	Name                  string       `json:"name"`
-	NextStatementDate     Milliseconds `json:"nextStatementDate"`
-	PartNumber            string       `json:"partNumber"`
-	PastDueDebt           *Amount      `json:"pastDueDebt"`
-	SharedByMeFlag        bool         `json:"sharedByMeFlag"`
-	Status                string       `json:"status"`
+	Id                    string            `json:"id"`
+	Currency              *Currency         `json:"currency,omitempty"`
+	CreditLimit           *MoneyAmount      `json:"creditLimit,omitempty"`
+	MoneyAmount           *MoneyAmount      `json:"moneyAmount,omitempty"`
+	DebtBalance           *MoneyAmount      `json:"debtBalance,omitempty"`
+	CurrentMinimalPayment *MoneyAmount      `json:"currentMinimalPayment,omitempty"`
+	ClientUnverifiedFlag  *string           `json:"clientUnverifiedFlag,omitempty"`
+	IdentificationState   *string           `json:"identificationState,omitempty"`
+	Status                *string           `json:"status,omitempty"`
+	EmoneyFlag            *bool             `json:"emoneyFlag,omitempty"`
+	NextStatementDate     *Milliseconds     `json:"nextStatementDate,omitempty"`
+	DueDate               *Milliseconds     `json:"dueDate,omitempty"`
+	Cards                 []Card            `json:"cards,omitempty"`
+	MultiCardCluster      *MultiCardCluster `json:"multiCardCluster,omitempty"`
+	LoyaltyId             *string           `json:"loyaltyId,omitempty"`
+	MoneyPotFlag          *bool             `json:"moneyPotFlag,omitempty"`
+	PartNumber            *string           `json:"partNumber,omitempty"`
+	PastDueDebt           *MoneyAmount      `json:"pastDueDebt,omitempty"`
+	Name                  string            `json:"name"`
+	AccountType           string            `json:"accountType"`
+	Hidden                bool              `json:"hidden"`
+	SharedByMeFlag        *bool             `json:"sharedByMeFlag,omitempty"`
+	Loyalty               *Loyalty          `json:"loyalty,omitempty"`
+	CreationDate          *Milliseconds     `json:"creationDate,omitempty"`
+	DebtAmount            *MoneyAmount      `json:"debtAmount,omitempty"`
+	LastStatementDate     *Milliseconds     `json:"lastStatementDate,omitempty"`
+	DueColor              *int              `json:"dueColor,omitempty"`
+	LinkedAccountNumber   *string           `json:"linkedAccountNumber,omitempty"`
+	IsKidsSaving          *bool             `json:"isKidsSaving,omitempty"`
+	IsCrowdfunding        *bool             `json:"isCrowdfunding,omitempty"`
+	Shared                *AccountShared    `json:"shared,omitempty"`
 }
 
 type AccountsLightIbOut = []Account
 
 type OperationsIn struct {
-	Account                string    `url:"account" validate:"required"`
-	Start                  time.Time `url:"start,unixmilli" validate:"required"`
-	End                    time.Time `url:"end,unixmilli,omitempty"`
-	OperationId            string    `url:"operationId,omitempty"`
-	TrancheCreationAllowed *bool     `url:"trancheCreationAllowed,omitempty"`
-	LoyaltyPaymentProgram  string    `url:"loyaltyPaymentProgram,omitempty"`
-	LoyaltyPaymentStatus   string    `url:"loyaltyPaymentStatus,omitempty"`
+	Account                string     `url:"account" validate:"required"`
+	Start                  time.Time  `url:"start,unixmilli" validate:"required"`
+	End                    *time.Time `url:"end,unixmilli,omitempty"`
+	OperationId            *string    `url:"operationId,omitempty"`
+	TrancheCreationAllowed *bool      `url:"trancheCreationAllowed,omitempty"`
+	LoyaltyPaymentProgram  *string    `url:"loyaltyPaymentProgram,omitempty"`
+	LoyaltyPaymentStatus   *string    `url:"loyaltyPaymentStatus,omitempty"`
 }
 
 func (in OperationsIn) auth() auth             { return force }
@@ -270,32 +305,36 @@ type Location struct {
 }
 
 type LoyaltyAmount struct {
-	Loyalty             string  `json:"loyalty"`
-	LoyaltyImagine      bool    `json:"loyaltyImagine"`
-	LoyaltyPointsId     int64   `json:"loyaltyPointsId"`
-	LoyaltyPointsName   string  `json:"loyaltyPointsName"`
-	LoyaltyProgramId    string  `json:"loyaltyProgramId"`
-	LoyaltySteps        int     `json:"loyaltySteps"`
-	Name                string  `json:"name"`
-	PartialCompensation bool    `json:"partialCompensation"`
 	Value               float64 `json:"value"`
+	LoyaltyProgramId    string  `json:"loyaltyProgramId"`
+	Loyalty             string  `json:"loyalty"`
+	Name                string  `json:"name"`
+	LoyaltySteps        uint8   `json:"loyaltySteps"`
+	LoyaltyPointsId     uint8   `json:"loyaltyPointsId"`
+	LoyaltyPointsName   string  `json:"loyaltyPointsName"`
+	LoyaltyImagine      bool    `json:"loyaltyImagine"`
+	PartialCompensation bool    `json:"partialCompensation"`
 }
 
 type LoyaltyBonus struct {
+	Description      string        `json:"description"`
+	Icon             string        `json:"icon"`
+	LoyaltyType      string        `json:"loyaltyType"`
 	Amount           LoyaltyAmount `json:"amount"`
 	CompensationType string        `json:"compensationType"`
-	Description      string        `json:"description"`
-	LoyaltyType      string        `json:"loyaltyType"`
 }
 
 type Region struct {
-	City    string `json:"city"`
-	Country string `json:"country"`
+	Country    *string `json:"country,omitempty"`
+	City       *string `json:"city,omitempty"`
+	Address    *string `json:"address,omitempty"`
+	Zip        *string `json:"zip,omitempty"`
+	AddressRus *string `json:"addressRus,omitempty"`
 }
 
 type Merchant struct {
 	Name   string  `json:"name"`
-	Region *Region `json:"region"`
+	Region *Region `json:"region,omitempty"`
 }
 
 type SpendingCategory struct {
@@ -303,58 +342,128 @@ type SpendingCategory struct {
 	Name string `json:"name"`
 }
 
+type Brand struct {
+	Name          string  `json:"name"`
+	BaseTextColor *string `json:"baseTextColor,omitempty"`
+	Logo          *string `json:"logo,omitempty"`
+	Id            string  `json:"id"`
+	RoundedLogo   bool    `json:"roundedLogo"`
+	BaseColor     *string `json:"baseColor,omitempty"`
+	LogoFile      *string `json:"logoFile,omitempty"`
+	Link          *string `json:"link,omitempty"`
+	SvgLogoFile   *string `json:"svgLogoFile"`
+}
+
+type AdditionalInfo struct {
+	FieldName  string `json:"fieldName"`
+	FieldValue string `json:"fieldValue"`
+}
+
+type LoyaltyPaymentAmount struct {
+	LoyaltyAmount
+	Price float64 `json:"price"`
+}
+
+type LoyaltyPayment struct {
+	Amount   LoyaltyPaymentAmount `json:"amount"`
+	Status   string               `json:"status"`
+	SoldTime *Milliseconds        `json:"soldTime"`
+}
+
+type LoyaltyBonusSummary struct {
+	Amount float64 `json:"amount"`
+}
+
+type Payment struct {
+	SourceIsQr         bool           `json:"sourceIsQr"`
+	BankAccountId      string         `json:"bankAccountId"`
+	PaymentId          string         `json:"paymentId"`
+	ProviderGroupId    *string        `json:"providerGroupId,omitempty"`
+	PaymentType        string         `json:"paymentType"`
+	FeeAmount          *MoneyAmount   `json:"feeAmount,omitempty"`
+	ProviderId         string         `json:"providerId"`
+	HasPaymentOrder    bool           `json:"hasPaymentOrder"`
+	Comment            string         `json:"comment"`
+	IsQrPayment        bool           `json:"isQrPayment"`
+	FieldsValues       map[string]any `json:"fieldsValues"`
+	Repeatable         bool           `json:"repeatable"`
+	CardNumber         string         `json:"cardNumber"`
+	TemplateId         *string        `json:"templateId,omitempty"`
+	TemplateIsFavorite *bool          `json:"templateIsFavorite,omitempty"`
+}
+
+type Subgroup struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type Operation struct {
-	Account                string           `json:"account"`
-	AccountAmount          Amount           `json:"accountAmount"`
-	Amount                 Amount           `json:"amount"`
-	AuthorizationId        string           `json:"authorizationId"`
-	Card                   string           `json:"card"`
-	CardNumber             string           `json:"cardNumber"`
-	CardPresent            bool             `json:"cardPresent"`
-	Cashback               float64          `json:"cashback"`
-	CashbackAmount         Amount           `json:"cashbackAmount"`
-	Category               Category         `json:"category"`
-	Compensation           string           `json:"compensation"`
-	DebitingTime           Milliseconds     `json:"debitingTime"`
-	Description            string           `json:"description"`
-	Group                  string           `json:"group"`
-	HasShoppingReceipt     bool             `json:"hasShoppingReceipt"`
-	HasStatement           bool             `json:"hasStatement"`
-	Id                     string           `json:"id"`
-	IdSourceType           string           `json:"idSourceType"`
-	InstallmentStatus      string           `json:"installmentStatus"`
-	IsDispute              bool             `json:"isDispute"`
-	IsExternalCard         bool             `json:"isExternalCard"`
-	IsHce                  bool             `json:"isHce"`
-	IsInner                bool             `json:"isInner"`
-	IsOffline              bool             `json:"isOffline"`
-	IsSuspicious           bool             `json:"isSuspicious"`
-	IsTemplatable          bool             `json:"isTemplatable"`
-	Locations              []Location       `json:"locations"`
-	LoyaltyBonus           []LoyaltyBonus   `json:"loyaltyBonus"`
-	Mcc                    int              `json:"mcc"`
-	MccString              string           `json:"mccString"`
-	Merchant               Merchant         `json:"merchant"`
-	OperationTime          Milliseconds     `json:"operationTime"`
-	OperationTransferred   bool             `json:"operationTransferred"`
-	PointOfSaleId          int64            `json:"pointOfSaleId"`
-	PosId                  string           `json:"posId"`
-	SpendingCategory       SpendingCategory `json:"spendingCategory"`
-	Status                 string           `json:"status"`
-	TrancheCreationAllowed bool             `json:"trancheCreationAllowed"`
-	Type                   string           `json:"type"`
-	TypeSerno              int64            `json:"typeSerno"`
-	Ucid                   string           `json:"ucid"`
-	VirtualPaymentType     int              `json:"virtualPaymentType"`
+	IsDispute              bool                 `json:"isDispute"`
+	IsOffline              bool                 `json:"isOffline"`
+	HasStatement           bool                 `json:"hasStatement"`
+	IsSuspicious           bool                 `json:"isSuspicious"`
+	AuthorizationId        *string              `json:"authorizationId,omitempty"`
+	IsInner                bool                 `json:"isInner"`
+	Id                     string               `json:"id"`
+	Status                 string               `json:"status"`
+	OperationTransferred   bool                 `json:"operationTransferred"`
+	IdSourceType           string               `json:"idSourceType"`
+	HasShoppingReceipt     *bool                `json:"hasShoppingReceipt,omitempty"`
+	Type                   string               `json:"type"`
+	Locations              []Location           `json:"locations,omitempty"`
+	LoyaltyBonus           []LoyaltyBonus       `json:"loyaltyBonus,omitempty"`
+	CashbackAmount         MoneyAmount          `json:"cashbackAmount"`
+	AuthMessage            *string              `json:"authMessage,omitempty"`
+	Description            string               `json:"description"`
+	IsTemplatable          bool                 `json:"isTemplatable"`
+	Cashback               float64              `json:"cashback"`
+	Brand                  *Brand               `json:"brand,omitempty"`
+	Amount                 MoneyAmount          `json:"amount"`
+	OperationTime          Milliseconds         `json:"operationTime"`
+	SpendingCategory       SpendingCategory     `json:"spendingCategory"`
+	IsHce                  bool                 `json:"isHce"`
+	Mcc                    uint                 `json:"mcc"`
+	Category               Category             `json:"category"`
+	AdditionalInfo         []AdditionalInfo     `json:"additionalInfo,omitempty"`
+	VirtualPaymentType     uint8                `json:"virtualPaymentType"`
+	Account                string               `json:"account"`
+	Ucid                   *string              `json:"ucid,omitempty"`
+	Merchant               *Merchant            `json:"merchant,omitempty"`
+	Card                   *string              `json:"card,omitempty"`
+	LoyaltyPayment         []LoyaltyPayment     `json:"loyaltyPayment,omitempty"`
+	TrancheCreationAllowed bool                 `json:"trancheCreationAllowed"`
+	Group                  *string              `json:"group,omitempty"`
+	MccString              string               `json:"mccString"`
+	CardPresent            bool                 `json:"cardPresent"`
+	IsExternalCard         bool                 `json:"isExternalCard"`
+	CardNumber             *string              `json:"cardNumber,omitempty"`
+	AccountAmount          MoneyAmount          `json:"accountAmount"`
+	LoyaltyBonusSummary    *LoyaltyBonusSummary `json:"loyaltyBonusSummary,omitempty"`
+	TypeSerno              *uint                `json:"typeSerno"`
+	Payment                *Payment             `json:"payment,omitempty"`
+	OperationPaymentType   *string              `json:"operationPaymentType,omitempty"`
+	Subgroup               *Subgroup            `json:"subgroup,omitempty"`
+	DebitingTime           *Milliseconds        `json:"debitingTime,omitempty"`
+	PosId                  *string              `json:"posId,omitempty"`
+	Subcategory            *string              `json:"subcategory,omitempty"`
+	SenderAgreement        *string              `json:"senderAgreement,omitempty"`
+	PointOfSaleId          *uint64              `json:"pointOfSaleId,omitempty"`
+	Compensation           *string              `json:"compensation,omitempty"`
+	InstallmentStatus      *string              `json:"installmentStatus,omitempty"`
+	SenderDetails          *string              `json:"senderDetails,omitempty"`
+	PartnerType            *string              `json:"partnerType,omitempty"`
+	Nomination             *string              `json:"nomination,omitempty"`
+	Message                *string              `json:"message,omitempty"`
+	TrancheId              *string              `json:"trancheId,omitempty"`
 }
 
 type OperationsOut = []Operation
 
 type ShoppingReceiptIn struct {
-	OperationId   string    `url:"operationId" validate:"required"`
-	OperationTime time.Time `url:"operationTime,unixmilli,omitempty"`
-	IdSourceType  string    `url:"idSourceType,omitempty"`
-	Account       string    `url:"account,omitempty"`
+	OperationId   string     `url:"operationId" validate:"required"`
+	OperationTime *time.Time `url:"operationTime,unixmilli,omitempty"`
+	IdSourceType  *string    `url:"idSourceType,omitempty"`
+	Account       *string    `url:"account,omitempty"`
 }
 
 func (in ShoppingReceiptIn) auth() auth                  { return force }
@@ -363,40 +472,44 @@ func (in ShoppingReceiptIn) out() (_ ShoppingReceiptOut) { return }
 func (in ShoppingReceiptIn) exprc() string               { return "OK" }
 
 type ReceiptItem struct {
-	BrandId  int64   `json:"brand_id"`
-	GoodId   int64   `json:"good_id"`
-	Name     string  `json:"name"`
-	Nds      int     `json:"nds"`
-	NdsRate  int     `json:"ndsRate"`
-	Price    float64 `json:"price"`
-	Quantity float64 `json:"quantity"`
-	Sum      float64 `json:"sum"`
+	Name     string   `json:"name"`
+	Price    float64  `json:"price"`
+	Sum      float64  `json:"sum"`
+	Quantity float64  `json:"quantity"`
+	NdsRate  *uint8   `json:"ndsRate"`
+	Nds      *uint8   `json:"nds"`
+	Nds10    *float64 `json:"nds10,omitempty"`
+	Nds18    *float64 `json:"nds18,omitempty"`
+	BrandId  int64    `json:"brand_id"`
+	GoodId   int64    `json:"good_id"`
 }
 
 type Receipt struct {
-	AppliedTaxationType     int           `json:"appliedTaxationType"`
+	RetailPlace             *string       `json:"retailPlace,omitempty"`
+	RetailPlaceAddress      *string       `json:"retailPlaceAddress,omitempty"`
+	CreditSum               *float64      `json:"creditSum,omitempty"`
+	ProvisionSum            *float64      `json:"provisionSum,omitempty"`
+	FiscalDriveNumber       *uint64       `json:"fiscalDriveNumber,omitempty"`
+	OperationType           uint8         `json:"operationType"`
 	CashTotalSum            float64       `json:"cashTotalSum"`
-	CreditSum               float64       `json:"creditSum"`
-	DateTime                Seconds       `json:"dateTime"`
-	EcashTotalSum           float64       `json:"ecashTotalSum"`
-	FiscalDocumentNumber    int64         `json:"fiscalDocumentNumber"`
-	FiscalDriveNumber       int64         `json:"fiscalDriveNumber"`
-	FiscalDriveNumberString string        `json:"fiscalDriveNumberString"`
-	FiscalSign              int64         `json:"fiscalSign"`
-	Items                   []ReceiptItem `json:"items"`
+	ShiftNumber             uint          `json:"shiftNumber"`
 	KktRegId                string        `json:"kktRegId"`
-	OperationType           int           `json:"operationType"`
-	Operator                string        `json:"operator"`
-	PrepaidSum              float64       `json:"prepaidSum"`
-	ProvisionSum            float64       `json:"provisionSum"`
-	RequestNumber           int64         `json:"requestNumber"`
-	RetailPlace             string        `json:"retailPlace"`
-	RetailPlaceAddress      string        `json:"retailPlaceAddress"`
-	ShiftNumber             int64         `json:"shiftNumber"`
-	TaxationType            int           `json:"taxationType"`
+	Items                   []ReceiptItem `json:"items"`
 	TotalSum                float64       `json:"totalSum"`
-	User                    string        `json:"user"`
+	EcashTotalSum           float64       `json:"ecashTotalSum"`
+	Nds10                   *float64      `json:"nds10,omitempty"`
+	Nds18                   *float64      `json:"nds18,omitempty"`
 	UserInn                 string        `json:"userInn"`
+	DateTime                Seconds       `json:"dateTime"`
+	TaxationType            uint8         `json:"taxationType"`
+	PrepaidSum              *float64      `json:"prepaidSum,omitempty"`
+	FiscalSign              uint64        `json:"fiscalSign"`
+	RequestNumber           uint          `json:"requestNumber"`
+	Operator                *string       `json:"operator,omitempty"`
+	AppliedTaxationType     uint8         `json:"appliedTaxationType"`
+	FiscalDocumentNumber    uint64        `json:"fiscalDocumentNumber"`
+	User                    *string       `json:"user,omitempty"`
+	FiscalDriveNumberString string        `json:"fiscalDriveNumberString"`
 }
 
 type ShoppingReceiptOut struct {

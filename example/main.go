@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AlekSi/pointer"
+
 	"github.com/caarlos0/env"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jfk9w-go/based"
@@ -196,10 +198,14 @@ func main() {
 	for _, account := range accounts {
 		spew.Dump(account)
 
+		if account.AccountType == "Telecom" || account.AccountType == "ExternalAccount" {
+			continue
+		}
+
 		operations, err := client.Operations(ctx, &tinkoff.OperationsIn{
 			Account: account.Id,
-			Start:   time.Date(2015, 1, 1, 0, 0, 0, 0, time.UTC),
-			End:     time.Now(),
+			Start:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+			//End:     pointer.To(time.Now()),
 		})
 
 		if err != nil {
@@ -212,7 +218,7 @@ func main() {
 		}
 
 		for _, operation := range operations {
-			if operation.HasShoppingReceipt {
+			if pointer.Get(operation.HasShoppingReceipt) {
 				spew.Dump(operation)
 
 				receipt, err := client.ShoppingReceipt(ctx, &tinkoff.ShoppingReceiptIn{
@@ -235,7 +241,5 @@ func main() {
 				break
 			}
 		}
-
-		break
 	}
 }

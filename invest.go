@@ -29,13 +29,20 @@ func (dt DateTimeMilliOffset) Time() time.Time {
 	return time.Time(dt)
 }
 
+const dateTimeMilliOffsetLayout = "2006-01-02T15:04:05.999-07:00"
+
+func (dt DateTimeMilliOffset) MarshalJSON() ([]byte, error) {
+	value := dt.Time().Format(dateTimeMilliOffsetLayout)
+	return json.Marshal(value)
+}
+
 func (dt *DateTimeMilliOffset) UnmarshalJSON(data []byte) error {
 	var str string
 	if err := json.Unmarshal(data, &str); err != nil {
 		return err
 	}
 
-	value, err := time.Parse("2006-01-02T15:04:05.999-07:00", str)
+	value, err := time.Parse(dateTimeMilliOffsetLayout, str)
 	if err != nil {
 		return err
 	}
@@ -54,6 +61,18 @@ type Date time.Time
 
 func (d Date) Time() time.Time {
 	return time.Time(d)
+}
+
+const dateLayout = "2006-01-02"
+
+func (d Date) MarshalJSON() ([]byte, error) {
+	location, err := dateLocation.Get(context.Background())
+	if err != nil {
+		return nil, errors.Wrap(err, "load location")
+	}
+
+	value := d.Time().In(location).Format(dateLayout)
+	return json.Marshal(value)
 }
 
 func (d *Date) UnmarshalJSON(data []byte) error {
@@ -157,7 +176,7 @@ type Trade struct {
 	Date     DateTimeMilliOffset `json:"date"`
 	Num      string              `json:"num"`
 	Price    InvestAmount        `json:"price"`
-	Quantity int                 `json:"quantity"`
+	Quantity *int                `json:"quantity"`
 }
 
 type TradesInfo struct {
@@ -174,7 +193,7 @@ type InvestOperation struct {
 	Cursor                        string              `json:"cursor"`
 	Date                          DateTimeMilliOffset `json:"date"`
 	Description                   string              `json:"description"`
-	DoneRest                      int                 `json:"doneRest"`
+	DoneRest                      *int                `json:"doneRest"`
 	Id                            string              `json:"id"`
 	InstrumentType                string              `json:"instrumentType"`
 	InstrumentUid                 string              `json:"instrumentUid"`
