@@ -154,12 +154,12 @@ func (in InvestAccountsIn) path() string               { return "/invest-gw/inve
 func (in InvestAccountsIn) out() (_ InvestAccountsOut) { return }
 
 type InvestTotals struct {
-	ExpectedAverageYield         InvestAmount `json:"expectedAverageYield"`
-	ExpectedAverageYieldRelative float64      `json:"expectedAverageYieldRelative"`
 	ExpectedYield                InvestAmount `json:"expectedYield"`
+	ExpectedYieldRelative        float64      `json:"expectedYieldRelative"`
 	ExpectedYieldPerDay          InvestAmount `json:"expectedYieldPerDay"`
 	ExpectedYieldPerDayRelative  float64      `json:"expectedYieldPerDayRelative"`
-	ExpectedYieldRelative        float64      `json:"expectedYieldRelative"`
+	ExpectedAverageYield         InvestAmount `json:"expectedAverageYield"`
+	ExpectedAverageYieldRelative float64      `json:"expectedAverageYieldRelative"`
 	TotalAmount                  InvestAmount `json:"totalAmount"`
 }
 

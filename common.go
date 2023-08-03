@@ -476,12 +476,12 @@ type ReceiptItem struct {
 	Price    float64  `json:"price"`
 	Sum      float64  `json:"sum"`
 	Quantity float64  `json:"quantity"`
-	NdsRate  *uint8   `json:"ndsRate"`
-	Nds      *uint8   `json:"nds"`
+	NdsRate  *uint8   `json:"ndsRate,omitempty"`
+	Nds      *uint8   `json:"nds,omitempty"`
 	Nds10    *float64 `json:"nds10,omitempty"`
 	Nds18    *float64 `json:"nds18,omitempty"`
-	BrandId  int64    `json:"brand_id"`
-	GoodId   int64    `json:"good_id"`
+	BrandId  uint64   `json:"brand_id,omitempty"`
+	GoodId   uint64   `json:"good_id,omitempty"`
 }
 
 type Receipt struct {
