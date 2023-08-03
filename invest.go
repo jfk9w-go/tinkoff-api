@@ -51,6 +51,34 @@ func (dt *DateTimeMilliOffset) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type DateTime time.Time
+
+func (dt DateTime) Time() time.Time {
+	return time.Time(dt)
+}
+
+const dateTimeLayout = "2006-01-02T15:04:05Z"
+
+func (dt DateTime) MarshalJSON() ([]byte, error) {
+	value := dt.Time().Format(dateTimeLayout)
+	return json.Marshal(value)
+}
+
+func (dt *DateTime) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+
+	value, err := time.Parse(dateTimeLayout, str)
+	if err != nil {
+		return err
+	}
+
+	*dt = DateTime(value)
+	return nil
+}
+
 var dateLocation = &based.Lazy[*time.Location]{
 	Fn: func(ctx context.Context) (*time.Location, error) {
 		return time.LoadLocation("Europe/Moscow")
@@ -136,16 +164,17 @@ type InvestTotals struct {
 }
 
 type InvestAccount struct {
-	AutoApp           bool   `json:"autoApp"`
 	BrokerAccountId   string `json:"brokerAccountId"`
 	BrokerAccountType string `json:"brokerAccountType"`
-	BuyByDefault      bool   `json:"buyByDefault"`
-	IsVisible         bool   `json:"isVisible"`
 	Name              string `json:"name"`
 	OpenedDate        Date   `json:"openedDate"`
 	Order             int    `json:"order"`
-	Organization      string `json:"organization"`
 	Status            string `json:"status"`
+	IsVisible         bool   `json:"isVisible"`
+	Organization      string `json:"organization"`
+	BuyByDefault      bool   `json:"buyByDefault"`
+	MarginEnabled     bool   `json:"marginEnabled"`
+	AutoApp           bool   `json:"autoApp"`
 
 	InvestTotals
 }
@@ -173,10 +202,12 @@ func (in InvestOperationsIn) path() string                 { return "/invest-gw/
 func (in InvestOperationsIn) out() (_ InvestOperationsOut) { return }
 
 type Trade struct {
-	Date     DateTimeMilliOffset `json:"date"`
-	Num      string              `json:"num"`
-	Price    InvestAmount        `json:"price"`
-	Quantity *int                `json:"quantity"`
+	Date          DateTimeMilliOffset `json:"date"`
+	Num           string              `json:"num"`
+	Price         InvestAmount        `json:"price"`
+	Quantity      int                 `json:"quantity"`
+	Yield         *InvestAmount       `json:"yield,omitempty"`
+	YieldRelative *float64            `json:"yieldRelative,omitempty"`
 }
 
 type TradesInfo struct {
@@ -184,37 +215,60 @@ type TradesInfo struct {
 	TradesSize int     `json:"tradesSize"`
 }
 
+type InvestChildOperation struct {
+	Currency       string       `json:"currency"`
+	Id             string       `json:"id"`
+	InstrumentType string       `json:"instrumentType"`
+	InstrumentUid  string       `json:"instrumentUid"`
+	LogoName       string       `json:"logoName"`
+	Payment        InvestAmount `json:"payment"`
+	ShowName       string       `json:"showName"`
+	Ticker         string       `json:"ticker"`
+	Type           string       `json:"type"`
+	Value          float64      `json:"value"`
+}
+
 type InvestOperation struct {
-	AccountName                   string              `json:"accountName"`
-	AssetUid                      string              `json:"assetUid"`
-	BestExecuted                  bool                `json:"bestExecuted"`
-	BrokerAccountId               string              `json:"brokerAccountId"`
-	ClassCode                     string              `json:"classCode"`
-	Cursor                        string              `json:"cursor"`
-	Date                          DateTimeMilliOffset `json:"date"`
-	Description                   string              `json:"description"`
-	DoneRest                      *int                `json:"doneRest"`
-	Id                            string              `json:"id"`
-	InstrumentType                string              `json:"instrumentType"`
-	InstrumentUid                 string              `json:"instrumentUid"`
-	InternalId                    string              `json:"internalId"`
-	IsBlockedTradeClearingAccount bool                `json:"isBlockedTradeClearingAccount"`
-	Isin                          string              `json:"isin"`
-	Name                          string              `json:"name"`
-	Payment                       InvestAmount        `json:"payment"`
-	PaymentEur                    InvestAmount        `json:"paymentEur"`
-	PaymentRub                    InvestAmount        `json:"paymentRub"`
-	PaymentUsd                    InvestAmount        `json:"paymentUsd"`
-	PositionUid                   string              `json:"positionUid"`
-	Price                         *InvestAmount       `json:"price"`
-	Quantity                      int                 `json:"quantity"`
-	ShortDescription              string              `json:"shortDescription"`
-	ShowName                      string              `json:"showName"`
-	Status                        string              `json:"status"`
-	Ticker                        string              `json:"ticker"`
-	TradesInfo                    *TradesInfo         `json:"tradesInfo"`
-	Type                          string              `json:"type"`
-	YieldRelative                 float64             `json:"yieldRelative"`
+	AccountName                   string                 `json:"accountName"`
+	AssetUid                      *string                `json:"assetUid,omitempty"`
+	BestExecuted                  bool                   `json:"bestExecuted"`
+	BrokerAccountId               string                 `json:"brokerAccountId"`
+	ClassCode                     *string                `json:"classCode,omitempty"`
+	Cursor                        string                 `json:"cursor"`
+	Date                          DateTimeMilliOffset    `json:"date"`
+	Description                   string                 `json:"description"`
+	Id                            *string                `json:"id,omitempty"`
+	InstrumentType                *string                `json:"instrumentType,omitempty"`
+	InstrumentUid                 *string                `json:"instrumentUid,omitempty"`
+	InternalId                    string                 `json:"internalId"`
+	IsBlockedTradeClearingAccount *bool                  `json:"isBlockedTradeClearingAccount,omitempty"`
+	Isin                          *string                `json:"isin,omitempty"`
+	LogoName                      *string                `json:"logoName,omitempty"`
+	Name                          *string                `json:"name,omitempty"`
+	Payment                       InvestAmount           `json:"payment"`
+	PaymentEur                    InvestAmount           `json:"paymentEur"`
+	PaymentRub                    InvestAmount           `json:"paymentRub"`
+	PaymentUsd                    InvestAmount           `json:"paymentUsd"`
+	PositionUid                   *string                `json:"positionUid,omitempty"`
+	ShortDescription              *string                `json:"shortDescription,omitempty"`
+	ShowName                      *string                `json:"showName,omitempty"`
+	Status                        string                 `json:"status"`
+	TextColor                     *string                `json:"textColor,omitempty"`
+	Ticker                        *string                `json:"ticker,omitempty"`
+	Type                          string                 `json:"type"`
+	AccountId                     *string                `json:"accountId,omitempty"`
+	DoneRest                      *int                   `json:"doneRest,omitempty"`
+	Price                         *InvestAmount          `json:"price,omitempty"`
+	Quantity                      *int                   `json:"quantity,omitempty"`
+	TradesInfo                    *TradesInfo            `json:"tradesInfo,omitempty"`
+	ParentOperationId             *string                `json:"parentOperationId,omitempty"`
+	ChildOperations               []InvestChildOperation `json:"childOperations,omitempty"`
+	Commission                    *InvestAmount          `json:"commission,omitempty"`
+	Yield                         *InvestAmount          `json:"yield,omitempty"`
+	YieldRelative                 *float64               `json:"yieldRelative,omitempty"`
+	CancelReason                  *string                `json:"cancelReason,omitempty"`
+	QuantityRest                  *int                   `json:"quantityRest,omitempty"`
+	WithdrawDateTime              *DateTime              `json:"withdrawDateTime,omitempty"`
 }
 
 type InvestOperationsOut struct {
