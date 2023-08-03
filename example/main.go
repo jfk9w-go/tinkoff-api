@@ -99,9 +99,9 @@ func (s jsonSessionStorage) open(flag int) (*os.File, error) {
 	return file, nil
 }
 
-type stdinConfirmationProvider struct{}
+type authorizer struct{}
 
-func (p stdinConfirmationProvider) GetConfirmationCode(ctx context.Context, phone string) (string, error) {
+func (a authorizer) GetConfirmationCode(ctx context.Context, phone string) (string, error) {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("Enter confirmation code for %s: ", phone)
 	text, err := reader.ReadString('\n')
@@ -132,8 +132,7 @@ func main() {
 			Phone:    config.Phone,
 			Password: config.Password,
 		},
-		ConfirmationProvider: stdinConfirmationProvider{},
-		SessionStorage:       jsonSessionStorage{path: config.SessionsFile},
+		SessionStorage: jsonSessionStorage{path: config.SessionsFile},
 	}.Build(ctx)
 
 	if err != nil {
@@ -141,6 +140,8 @@ func main() {
 	}
 
 	defer client.Close()
+
+	ctx = tinkoff.WithAuthorizer(ctx, authorizer{})
 
 	investOperationTypes, err := client.InvestOperationTypes(ctx)
 	if err != nil {

@@ -32,10 +32,6 @@ type SessionStorage interface {
 	UpdateSession(ctx context.Context, phone string, session *Session) error
 }
 
-type ConfirmationProvider interface {
-	GetConfirmationCode(ctx context.Context, phone string) (string, error)
-}
-
 type Credential struct {
 	Phone    string
 	Password string
@@ -48,10 +44,9 @@ var validate = based.Lazy[*validator.Validate]{
 }
 
 type ClientBuilder struct {
-	Clock                based.Clock          `validate:"required"`
-	Credential           Credential           `validate:"required"`
-	ConfirmationProvider ConfirmationProvider `validate:"required"`
-	SessionStorage       SessionStorage       `validate:"required"`
+	Clock          based.Clock    `validate:"required"`
+	Credential     Credential     `validate:"required"`
+	SessionStorage SessionStorage `validate:"required"`
 
 	Transport http.RoundTripper
 }
@@ -68,7 +63,6 @@ func (b ClientBuilder) Build(ctx context.Context) (*Client, error) {
 		httpClient: &http.Client{
 			Transport: b.Transport,
 		},
-		confirmationProvider: b.ConfirmationProvider,
 		session: based.NewWriteThroughCached[string, *Session](
 			based.WriteThroughCacheStorageFunc[string, *Session]{
 				LoadFn:   b.SessionStorage.LoadSession,
@@ -101,13 +95,12 @@ func (b ClientBuilder) Build(ctx context.Context) (*Client, error) {
 }
 
 type Client struct {
-	credential           Credential
-	httpClient           *http.Client
-	confirmationProvider ConfirmationProvider
-	session              *based.WriteThroughCached[*Session]
-	rateLimiters         map[string]based.Locker
-	cancel               context.CancelFunc
-	mu                   based.RWMutex
+	credential   Credential
+	httpClient   *http.Client
+	session      *based.WriteThroughCached[*Session]
+	rateLimiters map[string]based.Locker
+	cancel       context.CancelFunc
+	mu           based.RWMutex
 }
 
 func (c *Client) AccountsLightIb(ctx context.Context) (AccountsLightIbOut, error) {
@@ -195,6 +188,11 @@ func (c *Client) resetSessionID(ctx context.Context) error {
 }
 
 func (c *Client) authorize(ctx context.Context) (*Session, error) {
+	authorizer := getAuthorizer(ctx)
+	if authorizer == nil {
+		return nil, errors.New("authorizer is required, but not set")
+	}
+
 	var session *Session
 	if resp, err := executeCommon[sessionOut](ctx, c, sessionIn{}); err != nil {
 		return nil, errors.Wrap(err, "get new sessionid")
@@ -208,7 +206,7 @@ func (c *Client) authorize(ctx context.Context) (*Session, error) {
 	if resp, err := executeCommon[signUpOut](ctx, c, phoneSignUpIn{Phone: c.credential.Phone}); err != nil {
 		return nil, errors.Wrap(err, "phone sign up")
 	} else {
-		code, err := c.confirmationProvider.GetConfirmationCode(ctx, c.credential.Phone)
+		code, err := authorizer.GetConfirmationCode(ctx, c.credential.Phone)
 		if err != nil {
 			return nil, errors.Wrap(err, "get confirmation code")
 		}
