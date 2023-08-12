@@ -279,6 +279,54 @@ type Account struct {
 
 type AccountsLightIbOut = []Account
 
+type StatementsIn struct {
+	Account    string `url:"account" validate:"required"`
+	ItemsOrder string `url:"itemsOrder,omitempty"`
+}
+
+func (StatementsIn) auth() auth             { return force }
+func (StatementsIn) path() string           { return "/common/v1/statements" }
+func (StatementsIn) out() (_ StatementsOut) { return }
+func (StatementsIn) exprc() string          { return "OK" }
+
+type StatementPeriod struct {
+	Start Milliseconds `json:"start"`
+	End   Milliseconds `json:"end"`
+}
+
+type Statement struct {
+	OverdraftFee           MoneyAmount     `json:"overdraftFee"`
+	Expense                MoneyAmount     `json:"expense"`
+	OverLimitDebt          MoneyAmount     `json:"overLimitDebt"`
+	PeriodEndBalance       MoneyAmount     `json:"periodEndBalance"`
+	ArrestAmount           MoneyAmount     `json:"arrestAmount"`
+	OtherBonus             MoneyAmount     `json:"otherBonus"`
+	CreditLimit            MoneyAmount     `json:"creditLimit"`
+	TranchesMonthlyPayment *MoneyAmount    `json:"tranchesMonthlyPayment,omitempty"`
+	BilledDebt             MoneyAmount     `json:"billedDebt"`
+	Cashback               MoneyAmount     `json:"cashback"`
+	Balance                MoneyAmount     `json:"balance"`
+	HighCashback           MoneyAmount     `json:"highCashback"`
+	PeriodStartBalance     MoneyAmount     `json:"periodStartBalance"`
+	LowCashback            MoneyAmount     `json:"lowCashback"`
+	AvailableLimit         MoneyAmount     `json:"availableLimit"`
+	Id                     string          `json:"id"`
+	InterestBonus          MoneyAmount     `json:"interestBonus"`
+	Interest               MoneyAmount     `json:"interest"`
+	Date                   Milliseconds    `json:"date"`
+	Income                 MoneyAmount     `json:"income"`
+	CreditBonus            MoneyAmount     `json:"creditBonus"`
+	LastPaymentDate        *Milliseconds   `json:"lastPaymentDate,omitempty"`
+	OtherCashback          MoneyAmount     `json:"otherCashback"`
+	MinimalPaymentAmount   *MoneyAmount    `json:"minimalPaymentAmount,omitempty"`
+	PastDueDebt            *MoneyAmount    `json:"pastDueDebt,omitempty"`
+	Period                 StatementPeriod `json:"period"`
+	NoOverdue              *bool           `json:"noOverdue,omitempty"`
+	Repaid                 *string         `json:"repaid,omitempty"`
+}
+
+type StatementsOut = []Statement
+
 type OperationsIn struct {
 	Account                string     `url:"account" validate:"required"`
 	Start                  time.Time  `url:"start,unixmilli" validate:"required"`

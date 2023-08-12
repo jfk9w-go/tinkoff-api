@@ -112,6 +112,15 @@ func (c *Client) AccountsLightIb(ctx context.Context) (AccountsLightIbOut, error
 	return resp.Payload, nil
 }
 
+func (c *Client) Statements(ctx context.Context, in *StatementsIn) (StatementsOut, error) {
+	resp, err := executeCommon[StatementsOut](ctx, c, in)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Payload, nil
+}
+
 func (c *Client) Operations(ctx context.Context, in *OperationsIn) (OperationsOut, error) {
 	resp, err := executeCommon[OperationsOut](ctx, c, in)
 	if err != nil {
