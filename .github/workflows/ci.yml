@@ -21,4 +21,5 @@ jobs:
       - name: Test
         run: make test
       - name: Update test coverage
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: ncruces/go-coverage-report@main
