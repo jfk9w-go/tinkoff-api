@@ -1,10 +1,14 @@
 package tinkoff
 
 import (
+	"context"
 	"encoding/json"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/jfk9w-go/based"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -80,6 +84,12 @@ func (ms *Milliseconds) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+var secondsLocation = &based.Lazy[*time.Location]{
+	Fn: func(ctx context.Context) (*time.Location, error) {
+		return time.LoadLocation("Europe/Moscow")
+	},
+}
+
 type Seconds time.Time
 
 func (s Seconds) Time() time.Time {
@@ -87,16 +97,32 @@ func (s Seconds) Time() time.Time {
 }
 
 func (s Seconds) MarshalJSON() ([]byte, error) {
-	return json.Marshal(s.Time().Unix())
+	location, err := secondsLocation.Get(context.Background())
+	if err != nil {
+		return nil, errors.Wrap(err, "load location")
+	}
+
+	dt := s.Time().In(location)
+	dt = time.Date(dt.Year(), dt.Month(), dt.Day(), dt.Hour(), dt.Minute(), dt.Second(), dt.Nanosecond(), time.UTC)
+
+	return json.Marshal(dt.Unix())
 }
 
 func (s *Seconds) UnmarshalJSON(data []byte) error {
+	location, err := secondsLocation.Get(context.Background())
+	if err != nil {
+		return errors.Wrap(err, "load location")
+	}
+
 	var value int64
 	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
 
-	*s = Seconds(time.Unix(value, 0))
+	dt := time.Unix(value, 0).In(time.UTC)
+	dt = time.Date(dt.Year(), dt.Month(), dt.Day(), dt.Hour(), dt.Minute(), dt.Second(), dt.Nanosecond(), location)
+
+	*s = Seconds(dt)
 	return nil
 }
 

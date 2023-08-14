@@ -7,6 +7,12 @@ github.com/caarlos0/env
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/gabriel-vasile/mimetype v1.4.2
+## explicit; go 1.20
+github.com/gabriel-vasile/mimetype
+github.com/gabriel-vasile/mimetype/internal/charset
+github.com/gabriel-vasile/mimetype/internal/json
+github.com/gabriel-vasile/mimetype/internal/magic
 # github.com/go-playground/locales v0.14.1
 ## explicit; go 1.17
 github.com/go-playground/locales
@@ -14,13 +20,13 @@ github.com/go-playground/locales/currency
 # github.com/go-playground/universal-translator v0.18.1
 ## explicit; go 1.18
 github.com/go-playground/universal-translator
-# github.com/go-playground/validator v9.31.0+incompatible
-## explicit
-github.com/go-playground/validator
+# github.com/go-playground/validator/v10 v10.15.0
+## explicit; go 1.18
+github.com/go-playground/validator/v10
 # github.com/google/go-querystring v1.1.0
 ## explicit; go 1.10
 github.com/google/go-querystring/query
-# github.com/jfk9w-go/based v0.0.0-20230616110516-38f4c5c23679
+# github.com/jfk9w-go/based v0.0.0-20230805223938-9244097d63ce
 ## explicit; go 1.20
 github.com/jfk9w-go/based
 # github.com/leodido/go-urn v1.2.4
@@ -29,5 +35,19 @@ github.com/leodido/go-urn
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
-# gopkg.in/go-playground/assert.v1 v1.2.1
-## explicit
+# golang.org/x/crypto v0.12.0
+## explicit; go 1.17
+golang.org/x/crypto/sha3
+# golang.org/x/net v0.14.0
+## explicit; go 1.17
+golang.org/x/net/html
+golang.org/x/net/html/atom
+# golang.org/x/sys v0.11.0
+## explicit; go 1.17
+golang.org/x/sys/cpu
+# golang.org/x/text v0.12.0
+## explicit; go 1.17
+golang.org/x/text/internal/language
+golang.org/x/text/internal/language/compact
+golang.org/x/text/internal/tag
+golang.org/x/text/language

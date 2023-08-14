@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-playground/validator"
+	"github.com/go-playground/validator/v10"
 	"github.com/google/go-querystring/query"
 	"github.com/jfk9w-go/based"
 	"github.com/pkg/errors"
@@ -262,16 +262,27 @@ func (c *Client) ping(ctx context.Context) error {
 
 	return nil
 }
+
 func executeInvest[R any](ctx context.Context, c *Client, in investExchange[R]) (*R, error) {
-	ctx, cancel := c.mu.Lock(ctx)
+	ctx, cancel := c.rateLimiter(in.path()).Lock(ctx)
 	defer cancel()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
-	sessionID, err := c.ensureSessionID(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "ensure sessionid")
+	var sessionID string
+	if in.auth() {
+		ctx, cancel = c.mu.Lock(ctx)
+		defer cancel()
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		var err error
+		sessionID, err = c.ensureSessionID(ctx)
+		if err != nil {
+			return nil, errors.Wrap(err, "ensure sessionid")
+		}
 	}
 
 	urlQuery, err := query.Values(in)
@@ -279,7 +290,9 @@ func executeInvest[R any](ctx context.Context, c *Client, in investExchange[R]) 
 		return nil, errors.Wrap(err, "encode url query")
 	}
 
-	urlQuery.Set("sessionId", sessionID)
+	if sessionID != "" {
+		urlQuery.Set("sessionId", sessionID)
+	}
 
 	httpReq, err := http.NewRequest(http.MethodGet, baseURL+in.path(), nil)
 	if err != nil {
@@ -357,6 +370,12 @@ func ellipsis(data []byte) string {
 }
 
 func executeCommon[R any](ctx context.Context, c *Client, in commonExchange[R]) (*commonResponse[R], error) {
+	ctx, cancel := c.rateLimiter(in.path()).Lock(ctx)
+	defer cancel()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	var sessionID string
 	if in.auth() != none {
 		var (
@@ -382,12 +401,6 @@ func executeCommon[R any](ctx context.Context, c *Client, in commonExchange[R]) 
 		if err != nil {
 			return nil, errors.Wrap(err, "get sessionid")
 		}
-	}
-
-	ctx, cancel := c.rateLimiter(in.path()).Lock(ctx)
-	defer cancel()
-	if err := ctx.Err(); err != nil {
-		return nil, err
 	}
 
 	reqBody, err := query.Values(in)

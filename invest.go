@@ -19,6 +19,7 @@ func (e investError) Error() string {
 }
 
 type investExchange[R any] interface {
+	auth() bool
 	path() string
 	out() R
 }
@@ -125,6 +126,8 @@ func (d *Date) UnmarshalJSON(data []byte) error {
 
 type investOperationTypesIn struct{}
 
+func (in investOperationTypesIn) auth() bool { return false }
+
 func (in investOperationTypesIn) path() string {
 	return "/invest-gw/ca-operations/api/v1/operations/types"
 }
@@ -150,6 +153,7 @@ type InvestAccountsIn struct {
 	Currency string `url:"currency" validate:"required"`
 }
 
+func (in InvestAccountsIn) auth() bool                 { return true }
 func (in InvestAccountsIn) path() string               { return "/invest-gw/invest-portfolio/portfolios/accounts" }
 func (in InvestAccountsIn) out() (_ InvestAccountsOut) { return }
 
@@ -198,6 +202,7 @@ type InvestOperationsIn struct {
 	Cursor             string    `url:"cursor,omitempty"`
 }
 
+func (in InvestOperationsIn) auth() bool                   { return true }
 func (in InvestOperationsIn) path() string                 { return "/invest-gw/ca-operations/api/v1/user/operations" }
 func (in InvestOperationsIn) out() (_ InvestOperationsOut) { return }
 
