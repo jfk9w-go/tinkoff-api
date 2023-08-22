@@ -6,11 +6,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+// WriteThroughCacheStorage defines an interface for the underlying storage of WriteThroughCache.
 type WriteThroughCacheStorage[K comparable, V comparable] interface {
+
+	// Load loads the value from storage.
 	Load(ctx context.Context, key K) (V, error)
+
+	// Update persists the value in storage.
 	Update(ctx context.Context, key K, value V) error
 }
 
+// WriteThroughCacheStorageFunc provides a functional adapter for WriteThroughCacheStorage.
 type WriteThroughCacheStorageFunc[K comparable, V comparable] struct {
 	LoadFn   func(ctx context.Context, key K) (V, error)
 	UpdateFn func(ctx context.Context, key K, value V) error
@@ -24,12 +30,14 @@ func (f WriteThroughCacheStorageFunc[K, V]) Update(ctx context.Context, key K, v
 	return f.UpdateFn(ctx, key, value)
 }
 
+// WriteThroughCache provides a simple write-through cache implementation.
 type WriteThroughCache[K comparable, V comparable] struct {
 	storage WriteThroughCacheStorage[K, V]
 	values  map[K]V
 	mu      RWMutex
 }
 
+// NewWriteThroughCache creates a WriteThroughCache instance.
 func NewWriteThroughCache[K comparable, V comparable](storage WriteThroughCacheStorage[K, V]) *WriteThroughCache[K, V] {
 	return &WriteThroughCache[K, V]{
 		storage: storage,
@@ -37,6 +45,7 @@ func NewWriteThroughCache[K comparable, V comparable](storage WriteThroughCacheS
 	}
 }
 
+// Update updates the value in cache and underlying storage.
 func (c *WriteThroughCache[K, V]) Update(ctx context.Context, key K, value V) error {
 	ctx, cancel := c.mu.Lock(ctx)
 	defer cancel()
@@ -52,6 +61,9 @@ func (c *WriteThroughCache[K, V]) Update(ctx context.Context, key K, value V) er
 	return nil
 }
 
+// Get attempts to retrieve the value from cache. If no cached value is present,
+// it will be retrieved from underlying storage. If the value retrieved from storage
+// is not zero, it will be cached.
 func (c *WriteThroughCache[K, V]) Get(ctx context.Context, key K) (V, error) {
 	var zero V
 	if value, err := c.getFromCache(ctx, key); value != zero || err != nil {
@@ -91,11 +103,13 @@ func (c *WriteThroughCache[K, V]) getFromCache(ctx context.Context, key K) (V, e
 	return zero, nil
 }
 
+// WriteThroughCached provides write-through cache semantics for a single value.
 type WriteThroughCached[V comparable] struct {
 	getFn    func(ctx context.Context) (V, error)
 	updateFn func(ctx context.Context, value V) error
 }
 
+// NewWriteThroughCached creates a WriteThroughCached instance.
 func NewWriteThroughCached[K comparable, V comparable](storage WriteThroughCacheStorage[K, V], key K) *WriteThroughCached[V] {
 	cache := NewWriteThroughCache[K, V](storage)
 	return &WriteThroughCached[V]{
@@ -104,10 +118,14 @@ func NewWriteThroughCached[K comparable, V comparable](storage WriteThroughCache
 	}
 }
 
+// Get attempts to retrieve the value from cache. If no cached value is present,
+// it will be retrieved from underlying storage. If the value retrieved from storage
+// is not zero, it will be cached.
 func (c *WriteThroughCached[V]) Get(ctx context.Context) (V, error) {
 	return c.getFn(ctx)
 }
 
+// Update updates the value in cache and underlying storage.
 func (c *WriteThroughCached[V]) Update(ctx context.Context, value V) error {
 	return c.updateFn(ctx, value)
 }

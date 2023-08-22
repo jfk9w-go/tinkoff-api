@@ -6,6 +6,7 @@ import (
 	"os/signal"
 )
 
+// AwaitSignal waits for specified signals.
 func AwaitSignal(ctx context.Context, signals ...os.Signal) error {
 	c := make(chan os.Signal, 1)
 	go signal.Notify(c, signals...)

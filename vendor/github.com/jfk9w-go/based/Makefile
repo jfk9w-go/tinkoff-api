@@ -1,4 +1,4 @@
-MODULE := github.com/jfk9w-go/based
+MODULE := $(shell head -1 go.mod | cut -d ' ' -f2)
 
 build:
 	go build -v ./...
