@@ -84,11 +84,9 @@ func (ms *Milliseconds) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-var secondsLocation = &based.Lazy[*time.Location]{
-	Fn: func(ctx context.Context) (*time.Location, error) {
-		return time.LoadLocation("Europe/Moscow")
-	},
-}
+var secondsLocation = based.Lazy(func(ctx context.Context) (*time.Location, error) {
+	return time.LoadLocation("Europe/Moscow")
+})
 
 type Seconds time.Time
 
@@ -97,7 +95,7 @@ func (s Seconds) Time() time.Time {
 }
 
 func (s Seconds) MarshalJSON() ([]byte, error) {
-	location, err := secondsLocation.Get(context.Background())
+	location, err := secondsLocation(context.Background())
 	if err != nil {
 		return nil, errors.Wrap(err, "load location")
 	}
@@ -109,7 +107,7 @@ func (s Seconds) MarshalJSON() ([]byte, error) {
 }
 
 func (s *Seconds) UnmarshalJSON(data []byte) error {
-	location, err := secondsLocation.Get(context.Background())
+	location, err := secondsLocation(context.Background())
 	if err != nil {
 		return errors.Wrap(err, "load location")
 	}

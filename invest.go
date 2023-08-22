@@ -80,11 +80,11 @@ func (dt *DateTime) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-var dateLocation = &based.Lazy[*time.Location]{
-	Fn: func(ctx context.Context) (*time.Location, error) {
+var dateLocation = based.Lazy[*time.Location](
+	func(ctx context.Context) (*time.Location, error) {
 		return time.LoadLocation("Europe/Moscow")
 	},
-}
+)
 
 type Date time.Time
 
@@ -95,7 +95,7 @@ func (d Date) Time() time.Time {
 const dateLayout = "2006-01-02"
 
 func (d Date) MarshalJSON() ([]byte, error) {
-	location, err := dateLocation.Get(context.Background())
+	location, err := dateLocation(context.Background())
 	if err != nil {
 		return nil, errors.Wrap(err, "load location")
 	}
@@ -105,7 +105,7 @@ func (d Date) MarshalJSON() ([]byte, error) {
 }
 
 func (d *Date) UnmarshalJSON(data []byte) error {
-	location, err := dateLocation.Get(context.Background())
+	location, err := dateLocation(context.Background())
 	if err != nil {
 		return errors.Wrap(err, "load location")
 	}

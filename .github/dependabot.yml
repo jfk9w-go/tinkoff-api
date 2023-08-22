@@ -5,8 +5,4 @@ updates:
     schedule:
       interval: daily
     labels:
-      - deps
-    assignees:
-      - jfk9w
-    reviewers:
-      - jfk9w
+      - dependabot

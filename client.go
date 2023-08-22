@@ -9,13 +9,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/google/go-querystring/query"
 	"github.com/jfk9w-go/based"
 	"github.com/pkg/errors"
 )
 
-const baseURL = "https://www.tinkoff.ru/api"
+const (
+	baseURL      = "https://www.tinkoff.ru/api"
+	pingInterval = time.Minute
+)
 
 var (
 	ErrNoDataFound        = errors.New("no data found")
@@ -37,12 +39,6 @@ type Credential struct {
 	Password string
 }
 
-var validate = based.Lazy[*validator.Validate]{
-	Fn: func(ctx context.Context) (*validator.Validate, error) {
-		return validator.New(), nil
-	},
-}
-
 type ClientBuilder struct {
 	Clock          based.Clock    `validate:"required"`
 	Credential     Credential     `validate:"required"`
@@ -52,9 +48,7 @@ type ClientBuilder struct {
 }
 
 func (b ClientBuilder) Build(ctx context.Context) (*Client, error) {
-	if validate, err := validate.Get(ctx); err != nil {
-		return nil, err
-	} else if err := validate.Struct(b); err != nil {
+	if err := based.Validate.Struct(b); err != nil {
 		return nil, err
 	}
 
@@ -78,8 +72,8 @@ func (b ClientBuilder) Build(ctx context.Context) (*Client, error) {
 		},
 	}
 
-	c.cancel = based.GoWithFeedback(context.Background(), context.WithCancel, func(ctx context.Context) {
-		ticker := time.NewTicker(time.Minute)
+	c.pinger = based.Go(ctx, func(ctx context.Context) {
+		ticker := time.NewTicker(pingInterval)
 		defer ticker.Stop()
 		for {
 			_ = c.ping(ctx)
@@ -99,7 +93,7 @@ type Client struct {
 	httpClient   *http.Client
 	session      *based.WriteThroughCached[*Session]
 	rateLimiters map[string]based.Locker
-	cancel       context.CancelFunc
+	pinger       based.Goroutine
 	mu           based.RWMutex
 }
 
@@ -152,7 +146,8 @@ func (c *Client) InvestOperations(ctx context.Context, in *InvestOperationsIn) (
 }
 
 func (c *Client) Close() {
-	c.cancel()
+	c.pinger.Cancel()
+	_ = c.pinger.Join(context.Background())
 }
 
 func (c *Client) rateLimiter(path string) based.Locker {
@@ -160,7 +155,7 @@ func (c *Client) rateLimiter(path string) based.Locker {
 		return rateLimiter
 	}
 
-	return based.Unlock
+	return based.Unlocker
 }
 
 func (c *Client) getSessionID(ctx context.Context) (string, error) {
