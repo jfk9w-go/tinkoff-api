@@ -15,6 +15,7 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@v3
         with:
+          args: --verbose --timeout=10m
           version: latest
       - name: Build
         run: make build
