@@ -1,13 +1,14 @@
 MODULE := $(shell head -1 go.mod | cut -d ' ' -f2)
+GOIMPORTS := $(shell go env GOPATH)/bin/goimports
 
-build:
-	go build -v ./...
+$(GOIMPORTS):
+	go install golang.org/x/tools/cmd/goimports@latest
+
+fmt: $(GOIMPORTS)
+	$(GOIMPORTS) -local $(MODULE) -l -w $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
 test:
 	go test -v ./...
 
-tools:
-	go install golang.org/x/tools/cmd/goimports@latest
-
-fmt: tools
-	goimports -local $(MODULE) -l -w $(shell find . -type f -name '*.go' -not -path "./vendor/*")
+build:
+	go build -v ./...
