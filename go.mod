@@ -7,7 +7,7 @@ require (
 	github.com/caarlos0/env v3.5.0+incompatible
 	github.com/davecgh/go-spew v1.1.1
 	github.com/google/go-querystring v1.1.0
-	github.com/jfk9w-go/based v0.0.5
+	github.com/jfk9w-go/based v0.0.6
 	github.com/pkg/errors v0.9.1
 )
 
