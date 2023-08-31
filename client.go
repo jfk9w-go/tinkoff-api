@@ -133,6 +133,15 @@ func (c *Client) ShoppingReceipt(ctx context.Context, in *ShoppingReceiptIn) (*S
 	return &resp.Payload, nil
 }
 
+func (c *Client) ClientOfferEssences(ctx context.Context) (ClientOfferEssencesOut, error) {
+	resp, err := executeCommon[ClientOfferEssencesOut](ctx, c, clientOfferEssencesIn{})
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Payload, nil
+}
+
 func (c *Client) InvestOperationTypes(ctx context.Context) (*InvestOperationTypesOut, error) {
 	return executeInvest[InvestOperationTypesOut](ctx, c, investOperationTypesIn{})
 }

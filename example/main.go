@@ -243,4 +243,12 @@ func main() {
 			}
 		}
 	}
+
+	clientOfferEssences, err := client.ClientOfferEssences(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("found %d client offer essences\n", len(clientOfferEssences))
+	spew.Dump(clientOfferEssences)
 }
