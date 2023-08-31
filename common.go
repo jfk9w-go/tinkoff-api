@@ -590,10 +590,6 @@ type ShoppingReceiptOut struct {
 	Receipt           Receipt      `json:"receipt"`
 }
 
-type ClientOfferEssencesAttributes struct {
-	NotificationFlag bool `json:"notificationFlag"`
-}
-
 type clientOfferEssencesIn struct{}
 
 func (clientOfferEssencesIn) auth() auth                      { return force }
@@ -602,29 +598,34 @@ func (clientOfferEssencesIn) out() (_ ClientOfferEssencesOut) { return }
 func (clientOfferEssencesIn) exprc() string                   { return "OK" }
 
 type ClientOfferEssence struct {
-	BaseColor    string   `json:"baseColor"`
-	BusinessType uint     `json:"businessType"`
+	Name         string   `json:"name"`
 	Description  string   `json:"description"`
+	BusinessType uint     `json:"businessType"`
+	IsActive     bool     `json:"isActive"`
+	BaseColor    string   `json:"baseColor"`
+	MccCodes     []string `json:"mccCodes,omitempty"`
+	Logo         string   `json:"logo"`
 	ExternalCode string   `json:"externalCode"`
 	ExternalId   string   `json:"externalId"`
 	Id           string   `json:"id"`
-	IsActive     bool     `json:"isActive"`
-	Logo         string   `json:"logo"`
-	MccCodes     []string `json:"mccCodes,omitempty"`
-	Name         string   `json:"name"`
 	Percent      uint     `json:"percent"`
 }
 
+type ClientOfferEssencesAttributes struct {
+	NotificationFlag bool `json:"notificationFlag"`
+}
+
 type ClientOfferEssences struct {
-	AccountIds            []string             `json:"accountIds"`
-	ActiveFrom            Milliseconds         `json:"activeFrom"`
-	ActiveTo              Milliseconds         `json:"activeTo"`
-	AvailableEssenceCount uint                 `json:"availableEssenceCount"`
-	DisplayFrom           Milliseconds         `json:"displayFrom"`
-	DisplayTo             Milliseconds         `json:"displayTo"`
-	Essences              []ClientOfferEssence `json:"essences"`
-	Id                    string               `json:"id"`
-	TypeCode              string               `json:"typeCode"`
+	TypeCode              string                        `json:"typeCode"`
+	AvailableEssenceCount uint                          `json:"availableEssenceCount"`
+	ActiveTo              Milliseconds                  `json:"activeTo"`
+	Attributes            ClientOfferEssencesAttributes `json:"attributes"`
+	ActiveFrom            Milliseconds                  `json:"activeFrom"`
+	Essences              []ClientOfferEssence          `json:"essences"`
+	DisplayTo             Milliseconds                  `json:"displayTo"`
+	AccountIds            []string                      `json:"accountIds"`
+	DisplayFrom           Milliseconds                  `json:"displayFrom"`
+	Id                    string                        `json:"id"`
 }
 
 type ClientOfferEssencesOut = []ClientOfferEssences
