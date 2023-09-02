@@ -2,6 +2,8 @@ module github.com/jfk9w-go/tinkoff-api
 
 go 1.21
 
+toolchain go1.21.0
+
 require (
 	github.com/AlekSi/pointer v1.2.0
 	github.com/caarlos0/env v3.5.0+incompatible
