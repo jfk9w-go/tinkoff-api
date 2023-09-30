@@ -319,29 +319,29 @@ type StatementPeriod struct {
 }
 
 type Statement struct {
-	OverdraftFee           MoneyAmount     `json:"overdraftFee"`
+	OverdraftFee           *MoneyAmount    `json:"overdraftFee,omitempty"`
 	Expense                MoneyAmount     `json:"expense"`
-	OverLimitDebt          MoneyAmount     `json:"overLimitDebt"`
+	OverLimitDebt          *MoneyAmount    `json:"overLimitDebt,omitempty"`
 	PeriodEndBalance       MoneyAmount     `json:"periodEndBalance"`
-	ArrestAmount           MoneyAmount     `json:"arrestAmount"`
-	OtherBonus             MoneyAmount     `json:"otherBonus"`
-	CreditLimit            MoneyAmount     `json:"creditLimit"`
+	ArrestAmount           *MoneyAmount    `json:"arrestAmount,omitempty"`
+	OtherBonus             *MoneyAmount    `json:"otherBonus,omitempty"`
+	CreditLimit            *MoneyAmount    `json:"creditLimit,omitempty"`
 	TranchesMonthlyPayment *MoneyAmount    `json:"tranchesMonthlyPayment,omitempty"`
-	BilledDebt             MoneyAmount     `json:"billedDebt"`
+	BilledDebt             *MoneyAmount    `json:"billedDebt,omitempty"`
 	Cashback               MoneyAmount     `json:"cashback"`
 	Balance                MoneyAmount     `json:"balance"`
-	HighCashback           MoneyAmount     `json:"highCashback"`
+	HighCashback           *MoneyAmount    `json:"highCashback,omitempty"`
 	PeriodStartBalance     MoneyAmount     `json:"periodStartBalance"`
-	LowCashback            MoneyAmount     `json:"lowCashback"`
-	AvailableLimit         MoneyAmount     `json:"availableLimit"`
+	LowCashback            *MoneyAmount    `json:"lowCashback,omitempty"`
+	AvailableLimit         *MoneyAmount    `json:"availableLimit,omitempty"`
 	Id                     string          `json:"id"`
-	InterestBonus          MoneyAmount     `json:"interestBonus"`
+	InterestBonus          *MoneyAmount    `json:"interestBonus,omitempty"`
 	Interest               MoneyAmount     `json:"interest"`
 	Date                   Milliseconds    `json:"date"`
 	Income                 MoneyAmount     `json:"income"`
-	CreditBonus            MoneyAmount     `json:"creditBonus"`
+	CreditBonus            *MoneyAmount    `json:"creditBonus,omitempty"`
 	LastPaymentDate        *Milliseconds   `json:"lastPaymentDate,omitempty"`
-	OtherCashback          MoneyAmount     `json:"otherCashback"`
+	OtherCashback          *MoneyAmount    `json:"otherCashback,omitempty"`
 	MinimalPaymentAmount   *MoneyAmount    `json:"minimalPaymentAmount,omitempty"`
 	PastDueDebt            *MoneyAmount    `json:"pastDueDebt,omitempty"`
 	Period                 StatementPeriod `json:"period"`
