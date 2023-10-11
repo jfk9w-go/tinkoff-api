@@ -39,7 +39,7 @@ type Credential struct {
 	Password string
 }
 
-type ClientBuilder struct {
+type ClientParams struct {
 	Clock          based.Clock    `validate:"required"`
 	Credential     Credential     `validate:"required"`
 	SessionStorage SessionStorage `validate:"required"`
@@ -47,54 +47,53 @@ type ClientBuilder struct {
 	Transport http.RoundTripper
 }
 
-func (b ClientBuilder) Build(ctx context.Context) (*Client, error) {
-	if err := based.Validate.Struct(b); err != nil {
-		return nil, err
-	}
-
-	c := &Client{
-		credential: b.Credential,
-		httpClient: &http.Client{
-			Transport: b.Transport,
-		},
-		session: based.NewWriteThroughCached[string, *Session](
-			based.WriteThroughCacheStorageFunc[string, *Session]{
-				LoadFn:   b.SessionStorage.LoadSession,
-				UpdateFn: b.SessionStorage.UpdateSession,
-			},
-			b.Credential.Phone,
-		),
-		rateLimiters: map[string]based.Locker{
-			shoppingReceiptPath: based.Lockers{
-				based.Semaphore(b.Clock, 25, 75*time.Second),
-				based.Semaphore(b.Clock, 75, 11*time.Minute),
-			},
-		},
-	}
-
-	c.pinger = based.Go(ctx, func(ctx context.Context) {
-		ticker := time.NewTicker(pingInterval)
-		defer ticker.Stop()
-		for {
-			_ = c.ping(ctx)
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-			}
-		}
-	})
-
-	return c, nil
-}
-
 type Client struct {
 	credential   Credential
 	httpClient   *http.Client
 	session      *based.WriteThroughCached[*Session]
 	rateLimiters map[string]based.Locker
-	pinger       based.Goroutine
 	mu           based.RWMutex
+}
+
+func NewClient(params ClientParams) (*Client, error) {
+	if err := based.Validate(params); err != nil {
+		return nil, err
+	}
+
+	c := &Client{
+		credential: params.Credential,
+		httpClient: &http.Client{
+			Transport: params.Transport,
+		},
+		session: based.NewWriteThroughCached[string, *Session](
+			based.WriteThroughCacheStorageFunc[string, *Session]{
+				LoadFn:   params.SessionStorage.LoadSession,
+				UpdateFn: params.SessionStorage.UpdateSession,
+			},
+			params.Credential.Phone,
+		),
+		rateLimiters: map[string]based.Locker{
+			shoppingReceiptPath: based.Lockers{
+				based.Semaphore(params.Clock, 25, 75*time.Second),
+				based.Semaphore(params.Clock, 75, 11*time.Minute),
+			},
+		},
+	}
+
+	return c, nil
+}
+
+func (c *Client) Ping(ctx context.Context) {
+	ticker := time.NewTicker(pingInterval)
+	defer ticker.Stop()
+	for {
+		_ = c.ping(ctx)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 func (c *Client) AccountsLightIb(ctx context.Context) (AccountsLightIbOut, error) {
@@ -108,6 +107,15 @@ func (c *Client) AccountsLightIb(ctx context.Context) (AccountsLightIbOut, error
 
 func (c *Client) Statements(ctx context.Context, in *StatementsIn) (StatementsOut, error) {
 	resp, err := executeCommon[StatementsOut](ctx, c, in)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Payload, nil
+}
+
+func (c *Client) AccountRequisites(ctx context.Context, in *AccountRequisitesIn) (*AccountRequisitesOut, error) {
+	resp, err := executeCommon[*AccountRequisitesOut](ctx, c, in)
 	if err != nil {
 		return nil, err
 	}
@@ -152,11 +160,6 @@ func (c *Client) InvestAccounts(ctx context.Context, in *InvestAccountsIn) (*Inv
 
 func (c *Client) InvestOperations(ctx context.Context, in *InvestOperationsIn) (*InvestOperationsOut, error) {
 	return executeInvest[InvestOperationsOut](ctx, c, in)
-}
-
-func (c *Client) Close() {
-	c.pinger.Cancel()
-	_ = c.pinger.Join(context.Background())
 }
 
 func (c *Client) rateLimiter(path string) based.Locker {
