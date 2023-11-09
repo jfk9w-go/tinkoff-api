@@ -84,45 +84,45 @@ func (ms *Milliseconds) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-var secondsLocation = based.LazyFuncRef[*time.Location](
+var receiptDateTimeLocation = based.LazyFuncRef[*time.Location](
 	func(ctx context.Context) (*time.Location, error) {
 		return time.LoadLocation("Europe/Moscow")
 	},
 )
 
-type Seconds time.Time
+type ReceiptDateTime time.Time
 
-func (s Seconds) Time() time.Time {
-	return time.Time(s)
+func (dt ReceiptDateTime) Time() time.Time {
+	return time.Time(dt)
 }
 
-func (s Seconds) MarshalJSON() ([]byte, error) {
-	location, err := secondsLocation.Get(context.Background())
+func (dt ReceiptDateTime) MarshalJSON() ([]byte, error) {
+	location, err := receiptDateTimeLocation.Get(context.Background())
 	if err != nil {
 		return nil, errors.Wrap(err, "load location")
 	}
 
-	dt := s.Time().In(location)
-	dt = time.Date(dt.Year(), dt.Month(), dt.Day(), dt.Hour(), dt.Minute(), dt.Second(), dt.Nanosecond(), time.UTC)
+	value := dt.Time().In(location)
+	value = time.Date(value.Year(), value.Month(), value.Day(), value.Hour(), value.Minute(), value.Second(), value.Nanosecond(), time.UTC)
 
-	return json.Marshal(dt.Unix())
+	return json.Marshal(value.Unix())
 }
 
-func (s *Seconds) UnmarshalJSON(data []byte) error {
-	location, err := secondsLocation.Get(context.Background())
+func (dt *ReceiptDateTime) UnmarshalJSON(data []byte) error {
+	location, err := receiptDateTimeLocation.Get(context.Background())
 	if err != nil {
 		return errors.Wrap(err, "load location")
 	}
 
-	var value int64
-	if err := json.Unmarshal(data, &value); err != nil {
+	var secs int64
+	if err := json.Unmarshal(data, &secs); err != nil {
 		return err
 	}
 
-	dt := time.Unix(value, 0).In(time.UTC)
-	dt = time.Date(dt.Year(), dt.Month(), dt.Day(), dt.Hour(), dt.Minute(), dt.Second(), dt.Nanosecond(), location)
+	value := time.Unix(secs, 0).In(time.UTC)
+	value = time.Date(value.Year(), value.Month(), value.Day(), value.Hour(), value.Minute(), value.Second(), value.Nanosecond(), location)
 
-	*s = Seconds(dt)
+	*dt = ReceiptDateTime(value)
 	return nil
 }
 
@@ -583,31 +583,31 @@ type ReceiptItem struct {
 }
 
 type Receipt struct {
-	RetailPlace             *string       `json:"retailPlace,omitempty"`
-	RetailPlaceAddress      *string       `json:"retailPlaceAddress,omitempty"`
-	CreditSum               *float64      `json:"creditSum,omitempty"`
-	ProvisionSum            *float64      `json:"provisionSum,omitempty"`
-	FiscalDriveNumber       *uint64       `json:"fiscalDriveNumber,omitempty"`
-	OperationType           uint8         `json:"operationType"`
-	CashTotalSum            float64       `json:"cashTotalSum"`
-	ShiftNumber             uint          `json:"shiftNumber"`
-	KktRegId                string        `json:"kktRegId"`
-	Items                   []ReceiptItem `json:"items"`
-	TotalSum                float64       `json:"totalSum"`
-	EcashTotalSum           float64       `json:"ecashTotalSum"`
-	Nds10                   *float64      `json:"nds10,omitempty"`
-	Nds18                   *float64      `json:"nds18,omitempty"`
-	UserInn                 string        `json:"userInn"`
-	DateTime                Seconds       `json:"dateTime"`
-	TaxationType            uint8         `json:"taxationType"`
-	PrepaidSum              *float64      `json:"prepaidSum,omitempty"`
-	FiscalSign              uint64        `json:"fiscalSign"`
-	RequestNumber           uint          `json:"requestNumber"`
-	Operator                *string       `json:"operator,omitempty"`
-	AppliedTaxationType     uint8         `json:"appliedTaxationType"`
-	FiscalDocumentNumber    uint64        `json:"fiscalDocumentNumber"`
-	User                    *string       `json:"user,omitempty"`
-	FiscalDriveNumberString string        `json:"fiscalDriveNumberString"`
+	RetailPlace             *string         `json:"retailPlace,omitempty"`
+	RetailPlaceAddress      *string         `json:"retailPlaceAddress,omitempty"`
+	CreditSum               *float64        `json:"creditSum,omitempty"`
+	ProvisionSum            *float64        `json:"provisionSum,omitempty"`
+	FiscalDriveNumber       *uint64         `json:"fiscalDriveNumber,omitempty"`
+	OperationType           uint8           `json:"operationType"`
+	CashTotalSum            float64         `json:"cashTotalSum"`
+	ShiftNumber             uint            `json:"shiftNumber"`
+	KktRegId                string          `json:"kktRegId"`
+	Items                   []ReceiptItem   `json:"items"`
+	TotalSum                float64         `json:"totalSum"`
+	EcashTotalSum           float64         `json:"ecashTotalSum"`
+	Nds10                   *float64        `json:"nds10,omitempty"`
+	Nds18                   *float64        `json:"nds18,omitempty"`
+	UserInn                 string          `json:"userInn"`
+	DateTime                ReceiptDateTime `json:"dateTime"`
+	TaxationType            uint8           `json:"taxationType"`
+	PrepaidSum              *float64        `json:"prepaidSum,omitempty"`
+	FiscalSign              uint64          `json:"fiscalSign"`
+	RequestNumber           uint            `json:"requestNumber"`
+	Operator                *string         `json:"operator,omitempty"`
+	AppliedTaxationType     uint8           `json:"appliedTaxationType"`
+	FiscalDocumentNumber    uint64          `json:"fiscalDocumentNumber"`
+	User                    *string         `json:"user,omitempty"`
+	FiscalDriveNumberString string          `json:"fiscalDriveNumberString"`
 }
 
 type ShoppingReceiptOut struct {

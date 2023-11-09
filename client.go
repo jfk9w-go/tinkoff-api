@@ -162,6 +162,15 @@ func (c *Client) InvestOperations(ctx context.Context, in *InvestOperationsIn) (
 	return executeInvest[InvestOperationsOut](ctx, c, in)
 }
 
+func (c *Client) InvestCandles(ctx context.Context, in *InvestCandlesIn) (*InvestCandlesOut, error) {
+	resp, err := executeCommon[InvestCandlesOut](ctx, c, in)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp.Payload, nil
+}
+
 func (c *Client) rateLimiter(path string) based.Locker {
 	if rateLimiter, ok := c.rateLimiters[path]; ok {
 		return rateLimiter
