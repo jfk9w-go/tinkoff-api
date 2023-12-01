@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/AlekSi/pointer"
-
 	"github.com/caarlos0/env"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jfk9w-go/based"
@@ -126,20 +125,18 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	client, err := tinkoff.ClientBuilder{
+	client, err := tinkoff.NewClient(tinkoff.ClientParams{
 		Clock: based.StandardClock,
 		Credential: tinkoff.Credential{
 			Phone:    config.Phone,
 			Password: config.Password,
 		},
 		SessionStorage: jsonSessionStorage{path: config.SessionsFile},
-	}.Build(ctx)
+	})
 
 	if err != nil {
 		panic(err)
 	}
-
-	defer client.Close()
 
 	ctx = tinkoff.WithAuthorizer(ctx, authorizer{})
 

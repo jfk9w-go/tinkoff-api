@@ -80,7 +80,7 @@ func (dt *DateTime) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-var dateLocation = based.Lazy[*time.Location](
+var dateLocation = based.LazyFuncRef[*time.Location](
 	func(ctx context.Context) (*time.Location, error) {
 		return time.LoadLocation("Europe/Moscow")
 	},
@@ -95,7 +95,7 @@ func (d Date) Time() time.Time {
 const dateLayout = "2006-01-02"
 
 func (d Date) MarshalJSON() ([]byte, error) {
-	location, err := dateLocation(context.Background())
+	location, err := dateLocation.Get(context.Background())
 	if err != nil {
 		return nil, errors.Wrap(err, "load location")
 	}
@@ -105,7 +105,7 @@ func (d Date) MarshalJSON() ([]byte, error) {
 }
 
 func (d *Date) UnmarshalJSON(data []byte) error {
-	location, err := dateLocation(context.Background())
+	location, err := dateLocation.Get(context.Background())
 	if err != nil {
 		return errors.Wrap(err, "load location")
 	}
@@ -121,6 +121,27 @@ func (d *Date) UnmarshalJSON(data []byte) error {
 	}
 
 	*d = Date(value)
+	return nil
+}
+
+type InvestCandleDate time.Time
+
+func (d InvestCandleDate) Time() time.Time {
+	return time.Time(d)
+}
+
+func (d InvestCandleDate) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.Time().Unix())
+}
+
+func (d *InvestCandleDate) UnmarshalJSON(data []byte) error {
+	var secs int64
+	if err := json.Unmarshal(data, &secs); err != nil {
+		return err
+	}
+
+	value := time.Unix(secs, 0)
+	*d = InvestCandleDate(value)
 	return nil
 }
 
@@ -280,4 +301,29 @@ type InvestOperationsOut struct {
 	HasNext    bool              `json:"hasNext"`
 	Items      []InvestOperation `json:"items"`
 	NextCursor string            `json:"nextCursor"`
+}
+
+type InvestCandlesIn struct {
+	From       time.Time `url:"from" layout:"2006-01-02T15:04:05+00:00" validate:"required"`
+	To         time.Time `url:"to" layout:"2006-01-02T15:04:05+00:00" validate:"required"`
+	Resolution any       `url:"resolution" validate:"required"`
+	Ticker     string    `url:"ticker" validate:"required"`
+}
+
+func (InvestCandlesIn) auth() auth                { return force }
+func (InvestCandlesIn) path() string              { return "/api/trading/symbols/candles" }
+func (InvestCandlesIn) out() (_ InvestCandlesOut) { return }
+func (InvestCandlesIn) exprc() string             { return "OK" }
+
+type InvestCandle struct {
+	O    float64          `json:"o"`
+	C    float64          `json:"c"`
+	H    float64          `json:"h"`
+	L    float64          `json:"l"`
+	V    float64          `json:"v"`
+	Date InvestCandleDate `json:"date"`
+}
+
+type InvestCandlesOut struct {
+	Candles []InvestCandle `json:"candles"`
 }
