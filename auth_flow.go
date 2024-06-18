@@ -66,38 +66,6 @@ type SeleniumAuthFlow struct {
 	Capabilities selenium.Capabilities
 }
 
-type seleniumAuthStep uint8
-
-const (
-	seleniumAuthPhoneInput seleniumAuthStep = iota
-	seleniumAuthOTPInput
-	seleniumAuthPasswordInput
-	seleniumAuthAccessCode
-	seleniumAuthComplete
-)
-
-func (s seleniumAuthStep) xpath() string {
-	switch s {
-	case seleniumAuthPhoneInput:
-		return "//input[@name='phone']"
-	case seleniumAuthOTPInput:
-		return "//input[@name='otp']"
-	case seleniumAuthPasswordInput:
-		return "//input[@name='password']"
-	case seleniumAuthAccessCode:
-		return "//button[@automation-id='cancel-button']"
-	case seleniumAuthComplete:
-		return "//a[@href='/new-product/']"
-	default:
-		panic("unimplemented")
-	}
-}
-
-type seleniumAuthStepElement struct {
-	step    seleniumAuthStep
-	element selenium.WebElement
-}
-
 func (f *SeleniumAuthFlow) authorize(ctx context.Context, c *Client, authorizer Authorizer) (*Session, error) {
 	driver, err := selenium.NewRemote(f.Capabilities, "")
 	if err != nil {
@@ -114,87 +82,65 @@ func (f *SeleniumAuthFlow) authorize(ctx context.Context, c *Client, authorizer 
 		return nil, errors.Wrap(err, "open login page")
 	}
 
-	steps := map[seleniumAuthStep]bool{
-		seleniumAuthPhoneInput:    true,
-		seleniumAuthOTPInput:      true,
-		seleniumAuthPasswordInput: true,
-		seleniumAuthAccessCode:    true,
-		seleniumAuthComplete:      true,
-	}
-
-	for {
-		var se seleniumAuthStepElement
-		if err := driver.Wait(func(wd selenium.WebDriver) (bool, error) {
-			return f.detectStep(ctx, wd, steps, &se)
-		}); err != nil {
-			return nil, errors.Wrap(err, "detect step element")
-		}
-
-		switch se.step {
-		case seleniumAuthPhoneInput:
-			if err := se.element.SendKeys(c.credential.Phone + selenium.EnterKey); err != nil {
-				return nil, errors.Wrap(err, "input phone")
-			}
-		case seleniumAuthPasswordInput:
-			if err := se.element.SendKeys(c.credential.Password + selenium.EnterKey); err != nil {
-				return nil, errors.Wrap(err, "input password")
-			}
-		case seleniumAuthOTPInput:
+	var complete bool
+	steps := map[string]func(el selenium.WebElement) error{
+		"//input[@automation-id='phone-input']":    func(el selenium.WebElement) error { return el.SendKeys(c.credential.Phone + selenium.EnterKey) },
+		"//input[@automation-id='password-input']": func(el selenium.WebElement) error { return el.SendKeys(c.credential.Password + selenium.EnterKey) },
+		"//input[@automation-id='otp-input']": func(el selenium.WebElement) error {
 			code, err := authorizer.GetConfirmationCode(ctx, c.credential.Phone)
 			if err != nil {
-				return nil, errors.Wrap(err, "get confirmation code")
+				return errors.Wrap(err, "get confirmation code")
 			}
 
-			if err := se.element.SendKeys(code); err != nil {
-				return nil, errors.Wrap(err, "input otp")
-			}
-		case seleniumAuthAccessCode:
-			if err := se.element.Click(); err != nil {
-				return nil, errors.Wrap(err, "click access code cancel button")
-			}
-		case seleniumAuthComplete:
-			sessionID, err := driver.GetCookie("api_session")
-			if err != nil {
-				return nil, errors.Wrap(err, "session cookie not found")
-			}
-
-			return &Session{
-				ID: sessionID.Value,
-			}, nil
-		default:
-			panic("unimplemented")
-		}
-
-		delete(steps, se.step)
-	}
-}
-
-func (f *SeleniumAuthFlow) detectStep(ctx context.Context, driver selenium.WebDriver, steps map[seleniumAuthStep]bool, se *seleniumAuthStepElement) (bool, error) {
-	select {
-	case <-ctx.Done():
-		return false, ctx.Err()
-	default:
+			return el.SendKeys(code)
+		},
+		"//button[@automation-id='cancel-button']":   func(el selenium.WebElement) error { return el.Click() },
+		"//div[@automation-id='conversations-list']": func(_ selenium.WebElement) error { complete = true; return nil },
 	}
 
-	for step := range steps {
-		elements, err := driver.FindElements(selenium.ByXPATH, step.xpath())
-		if err != nil {
-			return false, err
-		}
-
-		for _, el := range elements {
-			displayed, err := el.IsDisplayed()
-			if err != nil {
-				return false, errors.Wrap(err, "get IsDisplayed")
+	for !complete {
+		if err := driver.Wait(func(wd selenium.WebDriver) (bool, error) {
+			select {
+			case <-ctx.Done():
+				return false, ctx.Err()
+			default:
 			}
 
-			if displayed {
-				se.step = step
-				se.element = el
-				return true, nil
+			for xpath, handle := range steps {
+				elements, err := driver.FindElements(selenium.ByXPATH, xpath)
+				if err != nil {
+					return false, errors.Wrapf(err, "find xpath '%s'", xpath)
+				}
+
+				for _, element := range elements {
+					displayed, err := element.IsDisplayed()
+					if err != nil {
+						return false, errors.Wrapf(err, "xpath '%s' is displayed", xpath)
+					}
+
+					if displayed {
+						if err := handle(element); err != nil {
+							return false, errors.Wrapf(err, "handle xpath '%s'", xpath)
+						}
+
+						delete(steps, xpath)
+						return true, nil
+					}
+				}
 			}
+
+			return false, nil
+		}); err != nil {
+			return nil, err
 		}
 	}
 
-	return false, nil
+	sessionID, err := driver.GetCookie("api_session")
+	if err != nil {
+		return nil, errors.Wrap(err, "session cookie not found")
+	}
+
+	return &Session{
+		ID: sessionID.Value,
+	}, nil
 }
