@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httputil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +17,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jfk9w-go/based"
 	"github.com/pkg/errors"
+	"github.com/tebeka/selenium"
 
 	"github.com/jfk9w-go/tinkoff-api"
 )
@@ -111,6 +114,33 @@ func (a authorizer) GetConfirmationCode(ctx context.Context, phone string) (stri
 	return strings.Trim(text, " \n\t\v"), nil
 }
 
+type httpTransport struct {
+	client http.Client
+}
+
+func (t *httpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	reqData, err := httputil.DumpRequestOut(req, true)
+	if err != nil {
+		return nil, errors.Wrap(err, "dump request")
+	}
+
+	fmt.Println(string(reqData))
+
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	respData, err := httputil.DumpResponse(resp, true)
+	if err != nil {
+		return nil, errors.Wrap(err, "dump response")
+	}
+
+	fmt.Println(string(respData))
+
+	return resp, nil
+}
+
 func main() {
 	var config struct {
 		Phone        string `env:"TINKOFF_PHONE,required"`
@@ -125,6 +155,13 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	seleniumService, err := selenium.NewChromeDriverService("/opt/homebrew/bin/chromedriver", 4444)
+	if err != nil {
+		panic(err)
+	}
+
+	defer seleniumService.Stop()
+
 	client, err := tinkoff.NewClient(tinkoff.ClientParams{
 		Clock: based.StandardClock,
 		Credential: tinkoff.Credential{
@@ -132,6 +169,8 @@ func main() {
 			Password: config.Password,
 		},
 		SessionStorage: jsonSessionStorage{path: config.SessionsFile},
+		Transport:      new(httpTransport),
+		AuthFlow:       new(tinkoff.SeleniumAuthFlow),
 	})
 
 	if err != nil {
