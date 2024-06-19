@@ -44,12 +44,14 @@ type ClientParams struct {
 	Credential     Credential     `validate:"required"`
 	SessionStorage SessionStorage `validate:"required"`
 
+	AuthFlow  AuthFlow
 	Transport http.RoundTripper
 }
 
 type Client struct {
-	credential   Credential
 	httpClient   *http.Client
+	authFlow     AuthFlow
+	credential   Credential
 	session      *based.WriteThroughCached[*Session]
 	rateLimiters map[string]based.Locker
 	mu           based.RWMutex
@@ -60,12 +62,18 @@ func NewClient(params ClientParams) (*Client, error) {
 		return nil, err
 	}
 
-	c := &Client{
-		credential: params.Credential,
+	authFlow := params.AuthFlow
+	if authFlow == nil {
+		authFlow = ApiAuthFlow
+	}
+
+	return &Client{
 		httpClient: &http.Client{
 			Transport: params.Transport,
 		},
-		session: based.NewWriteThroughCached[string, *Session](
+		authFlow:   authFlow,
+		credential: params.Credential,
+		session: based.NewWriteThroughCached(
 			based.WriteThroughCacheStorageFunc[string, *Session]{
 				LoadFn:   params.SessionStorage.LoadSession,
 				UpdateFn: params.SessionStorage.UpdateSession,
@@ -78,9 +86,7 @@ func NewClient(params ClientParams) (*Client, error) {
 				based.Semaphore(params.Clock, 75, 11*time.Minute),
 			},
 		},
-	}
-
-	return c, nil
+	}, nil
 }
 
 func (c *Client) Ping(ctx context.Context) {
@@ -97,7 +103,7 @@ func (c *Client) Ping(ctx context.Context) {
 }
 
 func (c *Client) AccountsLightIb(ctx context.Context) (AccountsLightIbOut, error) {
-	resp, err := executeCommon[AccountsLightIbOut](ctx, c, accountsLightIbIn{})
+	resp, err := executeCommon(ctx, c, accountsLightIbIn{})
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +112,7 @@ func (c *Client) AccountsLightIb(ctx context.Context) (AccountsLightIbOut, error
 }
 
 func (c *Client) Statements(ctx context.Context, in *StatementsIn) (StatementsOut, error) {
-	resp, err := executeCommon[StatementsOut](ctx, c, in)
+	resp, err := executeCommon(ctx, c, in)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +121,7 @@ func (c *Client) Statements(ctx context.Context, in *StatementsIn) (StatementsOu
 }
 
 func (c *Client) AccountRequisites(ctx context.Context, in *AccountRequisitesIn) (*AccountRequisitesOut, error) {
-	resp, err := executeCommon[*AccountRequisitesOut](ctx, c, in)
+	resp, err := executeCommon(ctx, c, in)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +130,7 @@ func (c *Client) AccountRequisites(ctx context.Context, in *AccountRequisitesIn)
 }
 
 func (c *Client) Operations(ctx context.Context, in *OperationsIn) (OperationsOut, error) {
-	resp, err := executeCommon[OperationsOut](ctx, c, in)
+	resp, err := executeCommon(ctx, c, in)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +139,7 @@ func (c *Client) Operations(ctx context.Context, in *OperationsIn) (OperationsOu
 }
 
 func (c *Client) ShoppingReceipt(ctx context.Context, in *ShoppingReceiptIn) (*ShoppingReceiptOut, error) {
-	resp, err := executeCommon[ShoppingReceiptOut](ctx, c, in)
+	resp, err := executeCommon(ctx, c, in)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +148,7 @@ func (c *Client) ShoppingReceipt(ctx context.Context, in *ShoppingReceiptIn) (*S
 }
 
 func (c *Client) ClientOfferEssences(ctx context.Context) (ClientOfferEssencesOut, error) {
-	resp, err := executeCommon[ClientOfferEssencesOut](ctx, c, clientOfferEssencesIn{})
+	resp, err := executeCommon(ctx, c, clientOfferEssencesIn{})
 	if err != nil {
 		return nil, err
 	}
@@ -151,19 +157,19 @@ func (c *Client) ClientOfferEssences(ctx context.Context) (ClientOfferEssencesOu
 }
 
 func (c *Client) InvestOperationTypes(ctx context.Context) (*InvestOperationTypesOut, error) {
-	return executeInvest[InvestOperationTypesOut](ctx, c, investOperationTypesIn{})
+	return executeInvest(ctx, c, investOperationTypesIn{})
 }
 
 func (c *Client) InvestAccounts(ctx context.Context, in *InvestAccountsIn) (*InvestAccountsOut, error) {
-	return executeInvest[InvestAccountsOut](ctx, c, in)
+	return executeInvest(ctx, c, in)
 }
 
 func (c *Client) InvestOperations(ctx context.Context, in *InvestOperationsIn) (*InvestOperationsOut, error) {
-	return executeInvest[InvestOperationsOut](ctx, c, in)
+	return executeInvest(ctx, c, in)
 }
 
 func (c *Client) InvestCandles(ctx context.Context, in *InvestCandlesIn) (*InvestCandlesOut, error) {
-	resp, err := executeCommon[InvestCandlesOut](ctx, c, in)
+	resp, err := executeCommon(ctx, c, in)
 	if err != nil {
 		return nil, err
 	}
@@ -193,15 +199,23 @@ func (c *Client) getSessionID(ctx context.Context) (string, error) {
 }
 
 func (c *Client) ensureSessionID(ctx context.Context) (string, error) {
-	session, err := c.session.Get(ctx)
-	if err != nil {
-		return "", err
+	var err error
+
+	session := getSession(ctx)
+	if session == nil {
+		session, err = c.session.Get(ctx)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	if session == nil {
 		if session, err = c.authorize(ctx); err != nil {
-			_ = c.resetSessionID(ctx)
-			return "", err
+			return "", errors.Wrap(err, "authorize")
+		}
+
+		if err = c.session.Update(ctx, session); err != nil {
+			return "", errors.Wrap(err, "store new sessionid")
 		}
 	}
 
@@ -218,42 +232,7 @@ func (c *Client) authorize(ctx context.Context) (*Session, error) {
 		return nil, errors.New("authorizer is required, but not set")
 	}
 
-	var session *Session
-	if resp, err := executeCommon[sessionOut](ctx, c, sessionIn{}); err != nil {
-		return nil, errors.Wrap(err, "get new sessionid")
-	} else {
-		session = &Session{ID: resp.Payload}
-		if err := c.session.Update(ctx, session); err != nil {
-			return nil, errors.Wrap(err, "store new sessionid")
-		}
-	}
-
-	if resp, err := executeCommon[signUpOut](ctx, c, phoneSignUpIn{Phone: c.credential.Phone}); err != nil {
-		return nil, errors.Wrap(err, "phone sign up")
-	} else {
-		code, err := authorizer.GetConfirmationCode(ctx, c.credential.Phone)
-		if err != nil {
-			return nil, errors.Wrap(err, "get confirmation code")
-		}
-
-		if _, err := executeCommon[confirmOut](ctx, c, confirmIn{
-			InitialOperation:       "sign_up",
-			InitialOperationTicket: resp.OperationTicket,
-			ConfirmationData:       confirmationData{SMSBYID: code},
-		}); err != nil {
-			return nil, errors.Wrap(err, "submit confirmation code")
-		}
-	}
-
-	if _, err := executeCommon[signUpOut](ctx, c, passwordSignUpIn{Password: c.credential.Password}); err != nil {
-		return nil, errors.Wrap(err, "password sign up")
-	}
-
-	if _, err := executeCommon[levelUpOut](ctx, c, levelUpIn{}); err != nil {
-		return nil, errors.Wrap(err, "level up")
-	}
-
-	return session, nil
+	return c.authFlow.authorize(ctx, c, authorizer)
 }
 
 func (c *Client) ping(ctx context.Context) error {
@@ -263,7 +242,7 @@ func (c *Client) ping(ctx context.Context) error {
 		return err
 	}
 
-	out, err := executeCommon[pingOut](ctx, c, pingIn{})
+	out, err := executeCommon(ctx, c, pingIn{})
 	if err != nil {
 		return errors.Wrap(err, "ping")
 	}
@@ -346,7 +325,7 @@ func executeInvest[R any](ctx context.Context, c *Client, in investExchange[R]) 
 		} else if err := json.Unmarshal(body, &investErr); err != nil {
 			return nil, errors.New(ellipsis(body))
 		} else {
-			if investErr.ErrorCode == "404" {
+			if investErr.ErrorCode == "404" || investErr.ErrorCode == "Forbidden" {
 				// this may be due to expired sessionid, try to check it
 				if err := c.ping(ctx); errors.Is(err, errUnauthorized) {
 					retry := &retryStrategy{
@@ -363,7 +342,7 @@ func executeInvest[R any](ctx context.Context, c *Client, in investExchange[R]) 
 						return nil, errors.Wrap(err, "authorize")
 					}
 
-					return executeInvest[R](ctx, c, in)
+					return executeInvest(ctx, c, in)
 				}
 			}
 
@@ -511,7 +490,7 @@ func executeCommon[R any](ctx context.Context, c *Client, in commonExchange[R]) 
 		case retryErr != nil:
 			return nil, retryErr
 		default:
-			return executeCommon[R](ctx, c, in)
+			return executeCommon(ctx, c, in)
 		}
 	}
 

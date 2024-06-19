@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httputil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -111,6 +113,33 @@ func (a authorizer) GetConfirmationCode(ctx context.Context, phone string) (stri
 	return strings.Trim(text, " \n\t\v"), nil
 }
 
+type httpTransport struct {
+	client http.Client
+}
+
+func (t *httpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	reqData, err := httputil.DumpRequestOut(req, true)
+	if err != nil {
+		return nil, errors.Wrap(err, "dump request")
+	}
+
+	fmt.Println(string(reqData))
+
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	respData, err := httputil.DumpResponse(resp, true)
+	if err != nil {
+		return nil, errors.Wrap(err, "dump response")
+	}
+
+	fmt.Println(string(respData))
+
+	return resp, nil
+}
+
 func main() {
 	var config struct {
 		Phone        string `env:"TINKOFF_PHONE,required"`
@@ -132,6 +161,8 @@ func main() {
 			Password: config.Password,
 		},
 		SessionStorage: jsonSessionStorage{path: config.SessionsFile},
+		Transport:      new(httpTransport),
+		AuthFlow:       new(tinkoff.SeleniumAuthFlow), // chromedriver --port=4444 --url-base=wd/hub --verbose
 	})
 
 	if err != nil {
