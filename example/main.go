@@ -17,7 +17,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jfk9w-go/based"
 	"github.com/pkg/errors"
-	"github.com/tebeka/selenium"
 
 	"github.com/jfk9w-go/tinkoff-api"
 )
@@ -155,13 +154,6 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	seleniumService, err := selenium.NewChromeDriverService("/opt/homebrew/bin/chromedriver", 4444)
-	if err != nil {
-		panic(err)
-	}
-
-	defer seleniumService.Stop()
-
 	client, err := tinkoff.NewClient(tinkoff.ClientParams{
 		Clock: based.StandardClock,
 		Credential: tinkoff.Credential{
@@ -170,7 +162,7 @@ func main() {
 		},
 		SessionStorage: jsonSessionStorage{path: config.SessionsFile},
 		Transport:      new(httpTransport),
-		AuthFlow:       new(tinkoff.SeleniumAuthFlow),
+		AuthFlow:       new(tinkoff.SeleniumAuthFlow), // chromedriver --port=4444 --url-base=wd/hub --verbose
 	})
 
 	if err != nil {

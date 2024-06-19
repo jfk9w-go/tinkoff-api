@@ -19,9 +19,16 @@ func getSession(ctx context.Context) *Session {
 	return nil
 }
 
-type authFlow interface {
+// AuthFlow обозначает способ аутентификации.
+type AuthFlow interface {
 	authorize(ctx context.Context, client *Client, authorizer Authorizer) (*Session, error)
 }
+
+// ApiAuthFlow производит аутентификацию с помощью вызовов API.
+// В начале июня 2024 Тинькофф что-то поменял, и теперь не срабатывает подтверждение СМС-кодом (не хватает каких-то полей).
+// Несмотря на то, что этот способ аутентификации сейчас не работает, он все еще остается дефолтным в клиенте для обратной
+// совместимости, и все еще остается в коде на случай потенциальной починки в будущем.
+var ApiAuthFlow AuthFlow = &apiAuthFlow{}
 
 type apiAuthFlow struct{}
 
@@ -62,12 +69,15 @@ func (f *apiAuthFlow) authorize(ctx context.Context, c *Client, authorizer Autho
 	return session, nil
 }
 
+// SeleniumAuthFlow производит аутентификацию с помощью Selenium.
+// Вероятно, самый оптимальный способ с точки зрения поддержки и дальнейших доработок.
 type SeleniumAuthFlow struct {
 	Capabilities selenium.Capabilities
+	URLPrefix    string
 }
 
 func (f *SeleniumAuthFlow) authorize(ctx context.Context, c *Client, authorizer Authorizer) (*Session, error) {
-	driver, err := selenium.NewRemote(f.Capabilities, "")
+	driver, err := selenium.NewRemote(f.Capabilities, f.URLPrefix)
 	if err != nil {
 		return nil, errors.Wrap(err, "create remote")
 	}
@@ -94,8 +104,8 @@ func (f *SeleniumAuthFlow) authorize(ctx context.Context, c *Client, authorizer 
 
 			return el.SendKeys(code)
 		},
-		"//button[@automation-id='cancel-button']":   func(el selenium.WebElement) error { return el.Click() },
-		"//div[@automation-id='conversations-list']": func(_ selenium.WebElement) error { complete = true; return nil },
+		"//button[@automation-id='cancel-button']": func(el selenium.WebElement) error { return el.Click() },
+		"//a[@href='/new-product/']":               func(_ selenium.WebElement) error { complete = true; return nil },
 	}
 
 	for !complete {

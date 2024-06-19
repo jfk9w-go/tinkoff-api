@@ -44,13 +44,13 @@ type ClientParams struct {
 	Credential     Credential     `validate:"required"`
 	SessionStorage SessionStorage `validate:"required"`
 
-	AuthFlow  authFlow
+	AuthFlow  AuthFlow
 	Transport http.RoundTripper
 }
 
 type Client struct {
 	httpClient   *http.Client
-	authFlow     authFlow
+	authFlow     AuthFlow
 	credential   Credential
 	session      *based.WriteThroughCached[*Session]
 	rateLimiters map[string]based.Locker
@@ -64,10 +64,10 @@ func NewClient(params ClientParams) (*Client, error) {
 
 	authFlow := params.AuthFlow
 	if authFlow == nil {
-		authFlow = &apiAuthFlow{}
+		authFlow = ApiAuthFlow
 	}
 
-	c := &Client{
+	return &Client{
 		httpClient: &http.Client{
 			Transport: params.Transport,
 		},
@@ -86,9 +86,7 @@ func NewClient(params ClientParams) (*Client, error) {
 				based.Semaphore(params.Clock, 75, 11*time.Minute),
 			},
 		},
-	}
-
-	return c, nil
+	}, nil
 }
 
 func (c *Client) Ping(ctx context.Context) {
