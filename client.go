@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	baseURL      = "https://www.tinkoff.ru/api"
+	baseURL      = "https://www.tbank.ru"
+	baseApiURL   = baseURL + "/api"
 	pingInterval = time.Minute
 )
 
@@ -289,7 +290,7 @@ func executeInvest[R any](ctx context.Context, c *Client, in investExchange[R]) 
 		urlQuery.Set("sessionId", sessionID)
 	}
 
-	httpReq, err := http.NewRequest(http.MethodGet, baseURL+in.path(), nil)
+	httpReq, err := http.NewRequest(http.MethodGet, baseApiURL+in.path(), nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "create http request")
 	}
@@ -403,7 +404,7 @@ func executeCommon[R any](ctx context.Context, c *Client, in commonExchange[R]) 
 		return nil, errors.Wrap(err, "encode form values")
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+in.path(), strings.NewReader(reqBody.Encode()))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseApiURL+in.path(), strings.NewReader(reqBody.Encode()))
 	if err != nil {
 		return nil, errors.Wrap(err, "create request")
 	}

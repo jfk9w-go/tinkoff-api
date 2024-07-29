@@ -88,7 +88,7 @@ func (f *SeleniumAuthFlow) authorize(ctx context.Context, c *Client, authorizer 
 		return nil, errors.Wrap(err, "maximize window")
 	}
 
-	if err := driver.Get("https://tinkoff.ru/auth/login"); err != nil {
+	if err := driver.Get(baseURL + "/login"); err != nil {
 		return nil, errors.Wrap(err, "open login page")
 	}
 
