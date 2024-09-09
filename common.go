@@ -354,7 +354,7 @@ type Statement struct {
 	CreditLimit            *MoneyAmount    `json:"creditLimit,omitempty"`
 	TranchesMonthlyPayment *MoneyAmount    `json:"tranchesMonthlyPayment,omitempty"`
 	BilledDebt             *MoneyAmount    `json:"billedDebt,omitempty"`
-	Cashback               MoneyAmount     `json:"cashback"`
+	Cashback               *MoneyAmount    `json:"cashback"`
 	Balance                MoneyAmount     `json:"balance"`
 	HighCashback           *MoneyAmount    `json:"highCashback,omitempty"`
 	PeriodStartBalance     MoneyAmount     `json:"periodStartBalance"`
@@ -362,7 +362,7 @@ type Statement struct {
 	AvailableLimit         *MoneyAmount    `json:"availableLimit,omitempty"`
 	Id                     string          `json:"id"`
 	InterestBonus          *MoneyAmount    `json:"interestBonus,omitempty"`
-	Interest               MoneyAmount     `json:"interest"`
+	Interest               *MoneyAmount    `json:"interest"`
 	Date                   Milliseconds    `json:"date"`
 	Income                 MoneyAmount     `json:"income"`
 	CreditBonus            *MoneyAmount    `json:"creditBonus,omitempty"`
