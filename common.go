@@ -634,7 +634,7 @@ type ClientOfferEssence struct {
 	ExternalCode string   `json:"externalCode"`
 	ExternalId   string   `json:"externalId"`
 	Id           string   `json:"id"`
-	Percent      uint     `json:"percent"`
+	Percent      float64  `json:"percent"`
 }
 
 type ClientOfferEssencesAttributes struct {

@@ -162,7 +162,7 @@ func main() {
 		},
 		SessionStorage: jsonSessionStorage{path: config.SessionsFile},
 		Transport:      new(httpTransport),
-		AuthFlow:       new(tinkoff.SeleniumAuthFlow), // chromedriver --port=4444 --url-base=wd/hub --verbose
+		AuthFlow:       new(tinkoff.SeleniumAuthFlow),
 	})
 
 	if err != nil {

@@ -404,7 +404,12 @@ func executeCommon[R any](ctx context.Context, c *Client, in commonExchange[R]) 
 		return nil, errors.Wrap(err, "encode form values")
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseApiURL+in.path(), strings.NewReader(reqBody.Encode()))
+	method := http.MethodPost
+	if _, ok := any(in).(clientOfferEssencesIn); ok {
+		method = http.MethodGet
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, method, baseApiURL+in.path(), strings.NewReader(reqBody.Encode()))
 	if err != nil {
 		return nil, errors.Wrap(err, "create request")
 	}
