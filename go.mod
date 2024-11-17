@@ -1,4 +1,4 @@
-module github.com/jfk9w-go/tinkoff-api
+module github.com/jfk9w-go/tinkoff-api/v2
 
 go 1.21
 

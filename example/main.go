@@ -18,7 +18,7 @@ import (
 	"github.com/jfk9w-go/based"
 	"github.com/pkg/errors"
 
-	"github.com/jfk9w-go/tinkoff-api"
+	"github.com/jfk9w-go/tinkoff-api/v2"
 )
 
 type jsonSessionStorage struct {
