@@ -11,9 +11,9 @@
             "mode": "auto",
             "program": "${workspaceFolder}/example/main.go",
             "console": "integratedTerminal",
-            "envFile": "${workspaceFolder}.env",
+            "envFile": "${workspaceFolder}/.env",
             "env": {
-                "TINKOFF_SESSIONS_FILE": "${workspaceFolder}/sessions.json"
+                "TBANK_SESSIONS_FILE": "${workspaceFolder}/sessions.json"
             }
         }
     ]

@@ -18,14 +18,14 @@ import (
 	"github.com/jfk9w-go/based"
 	"github.com/pkg/errors"
 
-	"github.com/jfk9w-go/tinkoff-api/v2"
+	tbank "github.com/jfk9w-go/tbank-api"
 )
 
 type jsonSessionStorage struct {
 	path string
 }
 
-func (s jsonSessionStorage) LoadSession(ctx context.Context, phone string) (*tinkoff.Session, error) {
+func (s jsonSessionStorage) LoadSession(ctx context.Context, phone string) (*tbank.Session, error) {
 	file, err := s.open(os.O_RDONLY)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -36,7 +36,7 @@ func (s jsonSessionStorage) LoadSession(ctx context.Context, phone string) (*tin
 	}
 
 	defer file.Close()
-	contents := make(map[string]tinkoff.Session)
+	contents := make(map[string]tbank.Session)
 	if err := json.NewDecoder(file).Decode(&contents); err != nil {
 		return nil, errors.Wrap(err, "decode json")
 	}
@@ -48,7 +48,7 @@ func (s jsonSessionStorage) LoadSession(ctx context.Context, phone string) (*tin
 	return nil, nil
 }
 
-func (s jsonSessionStorage) UpdateSession(ctx context.Context, phone string, session *tinkoff.Session) error {
+func (s jsonSessionStorage) UpdateSession(ctx context.Context, phone string, session *tbank.Session) error {
 	file, err := s.open(os.O_RDWR | os.O_CREATE)
 	if err != nil {
 		return err
@@ -59,7 +59,7 @@ func (s jsonSessionStorage) UpdateSession(ctx context.Context, phone string, ses
 		return errors.Wrap(err, "stat")
 	}
 
-	contents := make(map[string]tinkoff.Session)
+	contents := make(map[string]tbank.Session)
 	if stat.Size() > 0 {
 		if err := json.NewDecoder(file).Decode(&contents); err != nil {
 			return errors.Wrap(err, "decode json")
@@ -142,9 +142,9 @@ func (t *httpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func main() {
 	var config struct {
-		Phone        string `env:"TINKOFF_PHONE,required"`
-		Password     string `env:"TINKOFF_PASSWORD,required"`
-		SessionsFile string `env:"TINKOFF_SESSIONS_FILE,required"`
+		Phone        string `env:"TBANK_PHONE,required"`
+		Password     string `env:"TBANK_PASSWORD,required"`
+		SessionsFile string `env:"TBANK_SESSIONS_FILE,required"`
 	}
 
 	if err := env.Parse(&config); err != nil {
@@ -154,22 +154,22 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	client, err := tinkoff.NewClient(tinkoff.ClientParams{
+	client, err := tbank.NewClient(tbank.ClientParams{
 		Clock: based.StandardClock,
-		Credential: tinkoff.Credential{
+		Credential: tbank.Credential{
 			Phone:    config.Phone,
 			Password: config.Password,
 		},
 		SessionStorage: jsonSessionStorage{path: config.SessionsFile},
 		Transport:      new(httpTransport),
-		AuthFlow:       new(tinkoff.SeleniumAuthFlow),
+		AuthFlow:       new(tbank.SeleniumAuthFlow),
 	})
 
 	if err != nil {
 		panic(err)
 	}
 
-	ctx = tinkoff.WithAuthorizer(ctx, authorizer{})
+	ctx = tbank.WithAuthorizer(ctx, authorizer{})
 
 	investOperationTypes, err := client.InvestOperationTypes(ctx)
 	if err != nil {
@@ -182,7 +182,7 @@ func main() {
 		break
 	}
 
-	investAccounts, err := client.InvestAccounts(ctx, &tinkoff.InvestAccountsIn{
+	investAccounts, err := client.InvestAccounts(ctx, &tbank.InvestAccountsIn{
 		Currency: "RUB",
 	})
 
@@ -194,7 +194,7 @@ func main() {
 	for _, account := range investAccounts.Accounts.List {
 		spew.Dump(account)
 
-		investOperations, err := client.InvestOperations(ctx, &tinkoff.InvestOperationsIn{
+		investOperations, err := client.InvestOperations(ctx, &tbank.InvestOperationsIn{
 			From:            time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
 			To:              time.Now(),
 			Limit:           10,
@@ -231,7 +231,7 @@ func main() {
 			continue
 		}
 
-		operations, err := client.Operations(ctx, &tinkoff.OperationsIn{
+		operations, err := client.Operations(ctx, &tbank.OperationsIn{
 			Account: account.Id,
 			Start:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
 			//End:     pointer.To(time.Now()),
@@ -250,12 +250,12 @@ func main() {
 			if pointer.Get(operation.HasShoppingReceipt) {
 				spew.Dump(operation)
 
-				receipt, err := client.ShoppingReceipt(ctx, &tinkoff.ShoppingReceiptIn{
+				receipt, err := client.ShoppingReceipt(ctx, &tbank.ShoppingReceiptIn{
 					OperationId: operation.Id,
 				})
 
 				switch {
-				case errors.Is(err, tinkoff.ErrNoDataFound):
+				case errors.Is(err, tbank.ErrNoDataFound):
 					continue
 				case err != nil:
 					panic(err)
