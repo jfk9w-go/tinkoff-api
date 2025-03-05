@@ -10,9 +10,9 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/example/main.go",
+            "console": "integratedTerminal",
+            "envFile": "${workspaceFolder}.env",
             "env": {
-                "TINKOFF_PHONE": "79152655477",
-                "TINKOFF_PASSWORD": "Cfoded0ER@_4Kmpqk.6pyXkK9u5u-Hc2SH-ZXiXP",
                 "TINKOFF_SESSIONS_FILE": "${workspaceFolder}/sessions.json"
             }
         }

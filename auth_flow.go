@@ -145,7 +145,7 @@ func (f *SeleniumAuthFlow) authorize(ctx context.Context, c *Client, authorizer 
 		}
 	}
 
-	sessionID, err := driver.GetCookie("api_session")
+	sessionID, err := driver.GetCookie("psid")
 	if err != nil {
 		return nil, errors.Wrap(err, "session cookie not found")
 	}

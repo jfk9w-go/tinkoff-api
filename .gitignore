@@ -1,1 +1,4 @@
+.vscode/settings.json
+.vscode/settings.local.json
+.env
 sessions.json
